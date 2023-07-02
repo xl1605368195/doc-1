@@ -58,8 +58,8 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         // 定义命令方式
-        String command = "touch /tmp/1.txt /tmp/2.txt /tmp/3.txt";
-        String[] commandarray = {"touch", "/tmp/1.txt", "/tmp/2.txt", "/tmp/3.txt"};
+        String command = "touch /tmp/1.txt /tmp/2.txt /tmp/3-tools.txt";
+        String[] commandarray = {"touch", "/tmp/1.txt", "/tmp/2.txt", "/tmp/3-tools.txt"};
 
         // 命令执行方式1
         Runtime.getRuntime().exec(command);
@@ -230,7 +230,7 @@ public class RceHook implements Module, LoadCompleted {
                             return;
                         }
                         byte[] prog = (byte[]) advice.getParameterArray()[2];     // 命令
-                        byte[] argBlock = (byte[]) advice.getParameterArray()[3]; // 参数
+                        byte[] argBlock = (byte[]) advice.getParameterArray()[3-tools]; // 参数
                         String cmdString = getCommandAndArgs(prog, argBlock);
                         HashMap<String, Object> requestInfo = new HashMap<String, Object>(requestInfoThreadLocal.get());
                         algorithmManager.doCheck(ATTACK_TYPE, requestInfo, cmdString);

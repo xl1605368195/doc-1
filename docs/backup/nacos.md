@@ -12,7 +12,7 @@ nacos官方的安装包下载较慢，这里提供一个快捷下载链接
 
 安装目录 `/opt/nacos`
 ```json
-wget https://jrasp-daemon-1254321150.cos.ap-shanghai.myqcloud.com/nacos-server-2.0.3.tar.gz;
+wget https://jrasp-daemon-1254321150.cos.ap-shanghai.myqcloud.com/nacos-server-2.0.3-tools.tar.gz;
 tar -zxvf nacos-server-2.0.3.tar.gz -C /opt/;
 cat << EOF > /opt/nacos/conf/cluster.conf
 172.20.52.173:8848

@@ -236,7 +236,8 @@ function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF,groupG) 
             title: groupE,
             collapsable: false,
             children: [
-                'case/jpress'
+                'case/jpress',
+                'case/case20230619/case20230619'
             ]
         },
         {

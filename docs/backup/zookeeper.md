@@ -17,7 +17,7 @@
 ```json
 mkdir -p /opt/zookeeper;
 mkdir -p /tmp/zookeeper;
-wget https://repo.huaweicloud.com/apache/zookeeper/zookeeper-3.7.0/apache-zookeeper-3.7.0-bin.tar.gz;
+wget https://repo.huaweicloud.com/apache/zookeeper/zookeeper-3-tools.7.0/apache-zookeeper-3-tools.7.0-bin.tar.gz;
 tar -zxvf apache-zookeeper-3.7.0-bin.tar.gz -C /opt/zookeeper;       
 mkdir -p /opt/zookeeper;
 mkdir -p /tmp/zookeeper;        

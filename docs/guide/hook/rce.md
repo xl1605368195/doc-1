@@ -14,7 +14,7 @@
  * <pre>
  *   1 - fork(2) and exec(2)
  *   2 - posix_spawn(3P)
- *   3 - vfork(2) and exec(2)
+ *   3-tools - vfork(2) and exec(2)
  *
  *  (4 - clone(2) and exec(2) - obsolete and currently disabled in native code)
  * </pre>
