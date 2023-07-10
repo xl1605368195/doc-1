@@ -205,8 +205,8 @@ function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF,groupG) 
             title: groupB,
             collapsable: false,
             children: [
-                'install/saas',
-                'install/single',
+                'install/v1.1.2/jrasp-agent',
+                'install/v1.1.2/filebeat',
                 'example/example'
             ]
         },

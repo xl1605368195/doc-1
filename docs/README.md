@@ -2,7 +2,7 @@
 home: true
 heroImage: /images/system/welcome.png
 actionLinks:
-- link: /guide/install/saas.md
+- link: /guide/install/v1.1.2/jrasp-agent.md
   text: 快速上手 →
   class: primary
 - link: /other/wechart.md
