@@ -5,26 +5,18 @@
 支持 linux、macos、windows
 
 ## linux
-下载
+### jrasp-agent 安装
 ```shell
-wget https://www.download.jrasp.com/v1.1.2-20230709/jrasp-1.1.2-linux-amd64-bin.tar.gz
-```
-
-解压
-```shell
+# 下载
+wget https://www.download.jrasp.com/v1.1.2-20230711/jrasp-1.1.2-linux-amd64-bin.tar.gz
+#解压
 tar -zxvf jrasp-1.1.2-linux-amd64-bin.tar.gz -C /usr/local/
-```
-
-进入安装目录
-```shell
+#进入安装目录
 cd /usr/local/jrasp/bin/
-```
-
-启动
-```shell
+#启动
 nohup ./service.sh >/dev/null 2>&1 &
 ```
-或者 systemctl 自启动
+或者 systemctl 自启动 （可选）
 ```shell
 ## 配置守护进程        
 cat << EOF > /usr/lib/systemd/system/jrasp-daemon.service
@@ -49,31 +41,73 @@ systemctl stop jrasp-daemon.service;
 systemctl start jrasp-daemon.service;
 systemctl status jrasp-daemon.service;
 ```
+### filebeat 安装
+```shell
+# 下载
+wget https://www.download.jrasp.com/v1.1.2-20230709/filebeat-1.1.2-linux-x86_64.tar.gz
+# 解压
+tar -zxvf filebeat-1.1.2-linux-x86_64.tar.gz
+#进入安装目录
+cd filebeat
+# 启动
+./startup.sh
+```
+或者：linux可以使用systemctl设置自启动
+修改下面的fileBeatHome的值为实际安装目录 （可选）
+```shell
+fileBeatHome="/usr/local/filebeat"
+## systemctl
+cat << EOF > /usr/lib/systemd/system/filebeat.service
+[Unit]
+Description=filebeat
+Wants=network-online.target
+After=network-online.target
+[Service]
+User=root
+ExecStart=${fileBeatHome}/filebeat -c ${fileBeatHome}/filebeat.yml
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload && systemctl enable filebeat.service;
+systemctl stop filebeat.service && systemctl start filebeat.service;
+systemctl status filebeat.service;
+```
 
 ## macos
-下载
+### jrasp-agent 安装
 ```shell
-wget https://www.download.jrasp.com/v1.1.2-20230709/jrasp-1.1.2-bin-darwin.tar.gz
-```
-
-解压
-```shell
+# 下载
+wget https://www.download.jrasp.com/v1.1.2-20230711/jrasp-1.1.2-bin-darwin.tar.gz
+# 解压 
 tar -zxvf jrasp-1.1.2-bin-darwin.tar.gz
-```
-
-进入安装目录
-```shell
+# 进入安装目录
 cd jrasp/bin
-```
-
-启动
-```shell
+# 启动
 nohup ./service.sh >/dev/null 2>&1 &
+```
+### filebeat 安装
+```yaml
+# 下载
+wget https://www.download.jrasp.com/v1.1.2-20230709/filebeat-1.1.2-darwin-x86_64.tar.gz
+# 解压
+tar -zxvf filebeat-1.1.2-darwin-x86_64.tar.gz
+# 进入安装目录
+cd filebeat
+# 启动
+./startup.sh
 ```
 
 ## windows
 
 （安装资源准备中）
 
-----------------
-下一步安装 [filebeat](filebeat.md)
+## 管理端
+
+https://www.server.jrasp.com:8088/rasp-admin
+
+admin 123456
+
+安装完成之后,主机注册成功：
+
+![安装完成之后](install.png)
