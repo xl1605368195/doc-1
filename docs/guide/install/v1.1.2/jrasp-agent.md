@@ -5,15 +5,15 @@
 支持 linux、macos、windows
 
 ## linux
-### jrasp-agent 安装
+#### jrasp-agent 安装
 ```shell
 # 下载
 wget https://www.download.jrasp.com/v1.1.2-20230711/jrasp-1.1.2-linux-amd64-bin.tar.gz
-#解压
+# 解压
 tar -zxvf jrasp-1.1.2-linux-amd64-bin.tar.gz -C /usr/local/
-#进入安装目录
+# 进入安装目录
 cd /usr/local/jrasp/bin/
-#启动
+# 启动
 nohup ./service.sh >/dev/null 2>&1 &
 ```
 或者 systemctl 自启动 （可选）
@@ -41,19 +41,20 @@ systemctl stop jrasp-daemon.service;
 systemctl start jrasp-daemon.service;
 systemctl status jrasp-daemon.service;
 ```
-### filebeat 安装
+#### filebeat 安装
 ```shell
 # 下载
 wget https://www.download.jrasp.com/v1.1.2-20230709/filebeat-1.1.2-linux-x86_64.tar.gz
 # 解压
 tar -zxvf filebeat-1.1.2-linux-x86_64.tar.gz
-#进入安装目录
+# 进入安装目录
 cd filebeat
 # 启动
 ./startup.sh
 ```
-或者：linux可以使用systemctl设置自启动
-修改下面的fileBeatHome的值为实际安装目录 （可选）
+使用systemctl自启动 （可选）
+
+修改下面的fileBeatHome的值为实际jrasp安装目录 
 ```shell
 fileBeatHome="/usr/local/filebeat"
 ## systemctl
@@ -75,7 +76,7 @@ systemctl status filebeat.service;
 ```
 
 ## macos
-### jrasp-agent 安装
+#### jrasp-agent 安装
 ```shell
 # 下载
 wget https://www.download.jrasp.com/v1.1.2-20230711/jrasp-1.1.2-bin-darwin.tar.gz
@@ -86,7 +87,7 @@ cd jrasp/bin
 # 启动
 nohup ./service.sh >/dev/null 2>&1 &
 ```
-### filebeat 安装
+#### filebeat 安装
 ```yaml
 # 下载
 wget https://www.download.jrasp.com/v1.1.2-20230709/filebeat-1.1.2-darwin-x86_64.tar.gz
@@ -110,4 +111,4 @@ admin 123456
 
 安装完成之后,主机注册成功：
 
-![安装完成之后](install.png)
+![安装完成之后](./install.png)

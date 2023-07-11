@@ -206,7 +206,6 @@ function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF,groupG) 
             collapsable: false,
             children: [
                 'install/v1.1.2/jrasp-agent',
-                'install/v1.1.2/filebeat',
                 'example/example'
             ]
         },
