@@ -1,5 +1,57 @@
 # 版本迭代
 
+## 1.1.3  【2023-07-13】进行中
+
+
+## 1.1.2  【2023-07-11】
+
+> 1.1.2 以修复bug为主，新特性暂缓合入
+
+### Enhancement
++ [agent] 增加jvm性能监控
++ [module] 新增shiro检测模块
+
+### Bugfix
++ [module] xercesImpl 2.6.2 版本没有实现setFeature方法,调用会报错的问题
++ [module] 修复xml反序列化类型转换错误问题
++ [daemon] 修复docker主机名称获取bug
++ [module] 修复sql检测算法cpu耗时高的问题
++ [module] 修复命令token分割失败问题
+
+### TODO
++ [daemon] 支持容器&进程运行时注入
++ [agent] jrasp agent内置 filebeat
++ [module] 模块参数根据注解自动生成
+
+## 1.1.1 正式版 【2023-05】
+### Enhancement
++ [module] 新增内存马检测模块
++ [module] 模块增加编译时间便于区分版本
++ [daemon] deamon与server通信支持https
+### Bugfix
++ [agent] jrasp日志与tomcat日志完全隔离
+### TODO
++ [daemon] 支持安装目录lib下jar更新
+
+## 1.1.1 【2023-01】
+### Enhancement
++ [module] SQL检测增加LRU缓存，相同sql仅检测一次
++ [module] 检测模块增加自定义html
++ [module] 插件jar包支持加密与运行时类加载器解密
++ [工程] 将模块加密流程增加到maven plugin中
++ [工程] 支持 linux aarch64架构
+### Bugfix
++ [attach & build] 解决windows打包脚本兼容性问题，增加windows系统编译自动打包功能；
++ [module] 解决方法参数涉及第三方类时触发类的依赖加载bug
++ [agent] 修复字符串参数转map参数丢失bug
++ [agent] 修复全局配置非单例的bug @羽音
+### TODO
++ [部署方案] 小规模服务部署
++ [module] 支持sqlserver数据库
++ [agent] 去掉模块复制到run目录的功能
++ [工程] 提供方便测试的jrasp-vulns 工程
++ [daemon] 支持安装目录lib下jar更新
+
 ## 1.1.0【2022-10】
 #### Enhancement
 + [attach] 新增jrasp-attach工程(Golang)，支持手动注入、查看hook类、更新模块参数和卸载RASP
