@@ -283,13 +283,14 @@ function getCaseSidebar(groupA, groupB, groupC, groupD, groupE, groupF) {
                 'CVE-2016-3088',
             ]
         },
-        // 命令执行
+        // 表达式注入
         {
             title: groupB,
             collapsable: true,
             children: [
                 'Spring-Cloud-Function-spel',
-                'CVE-2020-13942'
+                'CVE-2020-13942',
+                'CVE-2017-7525'
             ]
         },
         // 反序列化

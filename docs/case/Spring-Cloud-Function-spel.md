@@ -25,6 +25,11 @@ SpringCloudFunction是一个SpringBoot开发的Servless中间件（FAAS），支
 
 ![img.png](../.vuepress/public/images/case/Spring-Cloud-Function/function-example.png)
 
+这里提供一个编译好的jar包
+```go
+https://jrasp-daemon-1254321150.cos.ap-shanghai.myqcloud.com/cve/SpringCloudFunction/scfunc-0.0.1-SNAPSHOT.jar
+```
+
 ### 启动 java 进程，并开启动态注入：
 
 ![img_1.png](../.vuepress/public/images/case/Spring-Cloud-Function/img_1.png)

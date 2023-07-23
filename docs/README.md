@@ -10,7 +10,7 @@ actionLinks:
   class: secondary
 features:
 - title: 请求低延迟
-  details: hook逻辑极致优化，使得一次正常http请求延时不超过0.5ms
+  details: hook逻辑极致优化，使得一次正常http请求延时低于5ms
 - title: 一键部署与热升级
   details: linux、macos和windows系统仅需一行命令即可以完成 JRASP 安装与运行，同时不需要重启就可以完成检测模块的热升级与热卸载
 - title: 内置安全策略
