@@ -205,7 +205,8 @@ function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF,groupG) 
             title: groupB,
             collapsable: false,
             children: [
-                'install/v1.1.2/jrasp-agent',
+                'install/v1.1.3/jrasp-agent',
+                //'install/v1.1.2/jrasp-agent',
                 'example/example'
             ]
         },
@@ -236,7 +237,8 @@ function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF,groupG) 
             collapsable: false,
             children: [
                 'case/jpress',
-                'case/case20230619/case20230619'
+                'case/case20230619/case20230619',
+                'case/case20230902/case20230902'
             ]
         },
         {

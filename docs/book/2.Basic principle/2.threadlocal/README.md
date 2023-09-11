@@ -1,7 +1,14 @@
 # 线程变量
 
-## ThreadLocal常用api以及使用
+为变量在线程中都创建副本，线程可访问自己内部的副本变量。
+该类提供了线程局部 (thread-local) 变量，
+访问这个变量（通过其 get 或 set 方法）的每个线程都有自己的局部变量，
+它独立于变量的初始化副本
+实现的原理：每个线程都有一个ThreadLocalMap类型变量threadLocals。
+ThreadLocal的set会在threadLocals中保存以ThreadLocal对象为key，
+以保存的变量为value的值，get会获取该值。
 
+## ThreadLocal常用api以及使用
 
 https://zhuanlan.zhihu.com/p/576975260
 ```java
@@ -26,7 +33,7 @@ public class ThreadLocalDemo {
 }
 ```
 ThreadLocal的用法非常简单，创建ThreadLocal的时候指定泛型类型，然后就是赋值、取值、删除值的操作。
-不同线程之间，ThreadLocal数据是隔离的，测试一下：
+不同线程之间，ThreadLocal数据是线程隔离的，测试一下：
 ```java
 public class ThreadLocalDemo {
     // 1. 创建ThreadLocal
@@ -173,10 +180,177 @@ public final class TestThreadId extends Thread {
 ```
 
 ## 源码解析
+
+### 初始化
+
+```text
+    public ThreadLocal() {
+    }
+```
+
+```text
+public static <S> ThreadLocal<S> withInitial(Supplier<? extends S> supplier) {
+        return new SuppliedThreadLocal<>(supplier);
+}
+```
+
+
+```text
+protected T initialValue() {
+        return null;
+}
+```
+
+获取线程变量的值
+
+返回此线程局部变量的当前线程副本中的值。如果变量没有当前线程的值，则首先将其初始化为initialValue方法调用返回的值。
+```text
+    public T get() {
+        Thread t = Thread.currentThread();
+        ThreadLocalMap map = getMap(t);
+        if (map != null) {
+            ThreadLocalMap.Entry e = map.getEntry(this);
+            if (e != null) {
+                @SuppressWarnings("unchecked")
+                T result = (T)e.value;
+                return result;
+            }
+        }
+        return setInitialValue();
+    }
+```
+
+```text
+    private T setInitialValue() {
+        T value = initialValue();
+        Thread t = Thread.currentThread();
+        ThreadLocalMap map = getMap(t);
+        if (map != null)
+            map.set(this, value);
+        else
+            createMap(t, value);
+        return value;
+    }
+```
+
+```text
+    public void set(T value) {
+        Thread t = Thread.currentThread();
+        ThreadLocalMap map = getMap(t);
+        if (map != null)
+            map.set(this, value);
+        else
+            createMap(t, value);
+    }
+```
+
+```text
+    public void remove() {
+         ThreadLocalMap m = getMap(Thread.currentThread());
+         if (m != null)
+             m.remove(this);
+     }
+
+    /**
+     * Get the map associated with a ThreadLocal. Overridden in
+     * InheritableThreadLocal.
+     *
+     * @param  t the current thread
+     * @return the map
+     */
+    ThreadLocalMap getMap(Thread t) {
+        return t.threadLocals;
+    }
+```
+
+
+线程中与 threadlocal 有关系的
+
+```text
+
+    /* ThreadLocal values pertaining to this thread. This map is maintained
+     * by the ThreadLocal class. */
+    ThreadLocal.ThreadLocalMap threadLocals = null;
+
+    /*
+     * InheritableThreadLocal values pertaining to this thread. This map is
+     * maintained by the InheritableThreadLocal class.
+     */
+    ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
+```
+初始化的逻辑在ThreadLocal中
+```text
+    /**
+     * Get the map associated with a ThreadLocal. Overridden in
+     * InheritableThreadLocal.
+     *
+     * @param  t the current thread
+     * @return the map
+     */
+    ThreadLocalMap getMap(Thread t) {
+        return t.threadLocals;
+    }
+
+    /**
+     * Create the map associated with a ThreadLocal. Overridden in
+     * InheritableThreadLocal.
+     *
+     * @param t the current thread
+     * @param firstValue value for the initial entry of the map
+     */
+    void createMap(Thread t, T firstValue) {
+        t.threadLocals = new ThreadLocalMap(this, firstValue);
+    }
+
+    /**
+     * Factory method to create map of inherited thread locals.
+     * Designed to be called only from Thread constructor.
+     *
+     * @param  parentMap the map associated with parent thread
+     * @return a map containing the parent's inheritable bindings
+     */
+    static ThreadLocalMap createInheritedMap(ThreadLocalMap parentMap) {
+        return new ThreadLocalMap(parentMap);
+    }
+```
+
+返回此线程本地变量的当前线程的`初始值`。该方法将在线程第一次使用get方法访问变量时执行，
+除非该线程以前调用过set方法，在这种情况下，不会为该线程调用initialValue方法。
+通常，每个线程最多调用一次此方法，但在随后调用remove和get的情况下，可能会再次调用此方法。
+此实现只返回null；如果程序员希望线程局部变量的初始值不是null，
+那么ThreadLocal必须被子类化，并且这个方法被重写。通常，将使用匿名内部类。
+
+
 ThreadLocal是线程本地变量，就是线程的私有变量，不同线程之间相互隔离，无法共享，相当于每个线程拷贝了一份变量的副本。
 
 目的就是在多线程环境中，无需加锁，也能保证数据的安全性。
 
+```text
+static class ThreadLocalMap {
+    // Entry对象，WeakReference是弱引用，当没有引用指向时，会被GC回收
+    static class Entry extends WeakReference<ThreadLocal<?>> {
+        // ThreadLocal泛型对象值
+        Object value;
+        // 构造方法，传参是key-value
+        // key是ThreadLocal对象实例，value是ThreadLocal泛型对象值
+        Entry(ThreadLocal<?> k, Object v) {
+            super(k);
+            value = v;
+        }
+    }
+  
+    // Entry数组，用来存储ThreadLocal数据
+    private Entry[] table;
+    // 数组的默认容量大小
+    private static final int INITIAL_CAPACITY = 16;
+    // 扩容的阈值，默认是数组大小的三分之二
+    private int threshold;
+
+    private void setThreshold(int len) {
+        threshold = len * 2 / 3;
+    }
+}
+```
 
 
 ## 使用常见
