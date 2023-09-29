@@ -1385,14 +1385,12 @@ jattach 给我们编译了各种平台的可执行文件，对于构建跨平台
 
 # 4.attach 的常见坑
 
-笔者总结了在Attach中遇到的各种各样的坑以及解决办法。
-
 ## 1.不同版本JDK在Attach成功后返回结果差异性
 
 ### 现象
 
 当使用JDK11去attach JDK8应用时，会抛异常com.sun.tools.attach.AgentLoadException: 0 ，
-但实际上已经attach成功了。
+但实际上已经attach成功了。异常结果如下：
 
 ```text
 [WARN] Current VM java version: 11 do not match target VM java version: 1.8, attach may fail.
@@ -1494,6 +1492,9 @@ try {
     }
 }
 ```
+上面的代码可以看出，在Attach抛出异常后，对异常进行分类处理，当抛出IOException并且异常的message中有"Non-numeric value found"，表示该异常是由于低版本Attach API attach 到高版本JDK上；
+当抛出的异常是AgentLoadException并且message的值为"0"时，表示该异常是由于高版本Attach API attach 到低版本JDK导致。对于其他异常，抛出即可。
+
 
 ## 2. java_pid<pid>文件被删除
 
@@ -1520,15 +1521,15 @@ ls: .java_pid3000: No such file or directory
 
 很不幸，这是一个JDK的bug，原因是JVM在首次被attach时会创建.java_pid<pid>用于socket通信，
 文件/tmp目录下（不同操作系统tmp目录位置不同，Linux 系统为/tmp 目录），该目录不可以被参数修改。
-在Attach listener初始化过程中，这个文件首次被创建后，JVM会标记Attach listener 为initialized，
-一旦文件被删除，这个Java进程无法被attach。
+在Attach listener初始化过程中，这个文件首次被创建后，JVM会标记Attach Listener为initialized状态，
+如果文件被删除了，这个Java进程无法被Attach。
 
 ### 方案
 
-+ 对于JDK8 来说，只能重启进程。
-+ 社区的讨论以及官方修复。
++ 对于JDK8来说，只能重启进程；
++ 社区的讨论以及官方修复；
 
-官方修复的 pr给Attach listener增加了INITIALIZING、NOT_INITIALIZED、INITIALIZED多种状态，并且在INITIALIZED状态下通过AttachListener::check_socket_file进行自检，如果发现文件不存在，会清理之前的listener，并重新建立。
+官方修复的pr给Attach Listener增加了INITIALIZING、NOT_INITIALIZED、INITIALIZED多种状态，并且在INITIALIZED状态下通过AttachListener::check_socket_file进行自检，如果发现文件不存在，会清理之前的listener，并重新建立。
 
 修复代码如下，在代码行号为17处，对.attach_pid<pid>文件进行检测。
 ```c++
@@ -1555,6 +1556,8 @@ if (cur_state == AL_INITIALIZING) {
   continue;
 }
 ```
+需要说明的是，该修复仅限JDK11高版本。
+
 ## 3.attach进程的权限问题
 
 ### 现象
@@ -1619,7 +1622,7 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
 }
 ```
 
-原则是上root权限不应该受到限制，因此JDK11对这个限制做了修复，可以使用root权限attach任意用户启动的Java进程。
+原则是上root权限不应该受到限制，因此JDK11对这个"不太合理"的限制做了解除，可以使用root权限attach任意用户启动的Java进程。
 
 ```c++
 // Dequeue an operation
@@ -1667,8 +1670,7 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
 }
 ```
 
-matches_effective_uid_and_gid_or_root 的实现如下
-
+matches_effective_uid_and_gid_or_root 的实现如下：
 ```json
 bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
     return is_root(uid) || (geteuid() == uid && getegid() == gid);
@@ -1677,7 +1679,7 @@ bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
 
 ### 解决方案
 
-切换到与用户相同权限执行然后再执行attach。 在介绍jattach工具时已经对这部分代码做了详细分析，这里不在赘述。
+切换到与用户相同权限执行然后再执行Attach。 在介绍jattach工具时已经对这部分代码做了详细分析，这里不在赘述。
 
 ## 4.com.sun.tools.attach.AttachNotSupportedException: no providers installed
 
@@ -1695,11 +1697,11 @@ bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
 
 systemPath标签用来指定本地的tools.jar位置，可以把tools.jar的绝对路径配置成相对路径：
 ```text
-    <dependency>
-    	<groupId>com.sun</groupId>
-    	<artifactId>tools</artifactId>
-    	<version>1.5.0</version>
-    	<scope>system</scope>
-    	<systemPath>${env.JAVA_HOME}/lib/tools.jar</systemPath>
-    </dependency>
+<dependency>
+	<groupId>com.sun</groupId>
+	<artifactId>tools</artifactId>
+	<version>1.5.0</version>
+	<scope>system</scope>
+	<systemPath>${env.JAVA_HOME}/lib/tools.jar</systemPath>
+</dependency>
 ```
