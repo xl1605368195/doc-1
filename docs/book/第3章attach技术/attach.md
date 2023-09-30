@@ -11,8 +11,8 @@ Attach API的包名称为`com.sun.tools.attach`。如下图3-1所示主要包含
 VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，提供了获取当前主机上的JVM列表功能、Attach动作和Detach动作等。
 VirtualMachineDescriptor则是一个描述虚拟机的类，配合VirtualMachine类完成各种功能。
 
-![图3-1 attach api 官方文档](images/图3-1 attach api 官方文档.png)
-图3-1 attach api 官方文档
+![图3-1 Attach API 官方文档](images/图3-1 Attach API 官方文档.png)
+图3-1 Attach API 官方文档
 
 主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面将重点介绍VirtualMachine类的使用。
 
