@@ -11,8 +11,8 @@ Attach API的包名称为`com.sun.tools.attach`。如下图3-1所示主要包含
 VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，提供了获取当前主机上的JVM列表功能、Attach动作和Detach动作等。
 VirtualMachineDescriptor则是一个描述虚拟机的类，配合VirtualMachine类完成各种功能。
 
-![图 3-1 attach api 官方文档](images/AttachAPI.png)
-图 3-1 attach api 官方文档
+![图3-1 attach api 官方文档](images/图3-1 attach api 官方文档.png)
+图3-1 attach api 官方文档
 
 主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面将重点介绍VirtualMachine类的使用。
 
@@ -496,7 +496,7 @@ bool AttachListener::is_init_trigger() {
 如果AttachListener没有初始化，则判断临时目录下.attach_pid<pid>文件是否存在，如果存在则调用init初始化AttachListener线程，初始化成功后返回true。
 
 因此Attach机制在Linux系统的流程可以描述为下图3-2。
-![图3-2 Attach机制信号与线程的处理流程](images/attach机制大致流程.png)
+![图3-2 Attach机制信号与线程的处理流程](images/图3-2 Attach机制信号与线程的处理流程.png)
 图3-2 Attach机制信号与线程的处理流程
 
 #### 3.2.2.2 Attach Listener
@@ -802,7 +802,7 @@ LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
 
 进程间详细的交互流程可以用下面的图3-3描述。
 
-![图3-3 Attach交互处理流程](images/attach详细流程.png)
+![图3-3 Attach交互处理流程](images/图3-3 Attach交互处理流程.png)
 图3-3 Attach交互处理流程
 
 ### 3.2.3 Attach机制涉及到的JVM参数
