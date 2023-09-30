@@ -5,15 +5,14 @@ Java Agent有着广泛的使用场景， 如运行时性能诊断工具Arthas和
 
 本章将从Attach API的基本使用、实现原理、开源工具和常见的坑等几个方面介绍Attach技术。
 
-## 1.Attach API 介绍
+## 3.1 Attach API 介绍
 从JDK1.6开始可以使用Attach API连接到目标JVM上并让目标JVM加载一个Java Agent。
-Attach API的包名称为`com.sun.tools.attach`。如下图所示主要包含三个类：AttachPermission、VirtualMachine、VirtualMachineDescriptor。
+Attach API的包名称为`com.sun.tools.attach`。如下图3-1所示主要包含2个类：VirtualMachine和VirtualMachineDescriptor。
 VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，提供了获取当前主机上的JVM列表功能、Attach动作和Detach动作等。
 VirtualMachineDescriptor则是一个描述虚拟机的类，配合VirtualMachine类完成各种功能。
 
-![attach api 官方文档](images/attach-api.png)
+![图 3-1 attach api 官方文档](images/attach-api.png "图 3-1 attach api 官方文档")
 
-图片来源（后期删除，下同）：https://docs.oracle.com/en/java/javase/20/docs/api/jdk.attach/com/sun/tools/attach/package-summary.html
 
 主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面将重点介绍VirtualMachine类的使用。
 
@@ -42,7 +41,7 @@ public class Main {
 上面的代码使用Attach API连接到进程pid为72695的Java进程上，
 然后读取目标JVM的系统参数并输出到终端，最后调用detach与目标JVM断开连接。
 
-从代码层面可以直观的理解，在执行完成attach之后，就获得了一个目标JVM的VirtualMachine对象，
+从代码层面可以直观的理解，在执行完成Attach之后，就获得了一个目标JVM的VirtualMachine对象，
 调用VirtualMachine对象的方法就可以完成对目标JVM的操作。
 
 上面代码的输出结果如下：
@@ -77,17 +76,22 @@ public abstract void startManagementAgent(Properties agentProperties) throws IOE
 public abstract String startLocalManagementAgent() throws IOException;
 ```
 
-# 2 实现原理
-在上一节介绍了Attach API的基本使用，本节将结合JDK源代码详细介绍其中的原理。
-Attach机制本质上是进程间的通信，外部进程通过JVM提供的socket连接到目标JVM上并发送指令，JVM接受并处理指令然后返回处理结果。
+## 3.2 实现原理
+在上一节介绍了Attach API的基本使用，本节将结合JDK源代码详细分析其中的实现原理。
+Attach机制本质上是进程间的通信，外部进程通过JVM提供的socket连接到目标JVM上并发送指令，
+目标JVM接受并处理指令然后返回处理结果。
 可能会比较奇怪，Attach时并没有发现JVM创建socket端口，其实JVM使用了Unix Domain Socket。
 
-## 2.1 Attach客户端源码解析
+### 3.2.1 Attach客户端源码解析
 
 有了前面一节的使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`com.sun.tools.attach.VirtualMachine`是抽象类，
 不同厂商的虚拟机可以实现不同VirtualMachine子类，
 HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，
-它也是一个抽象类，在不同操作系统上都有各自实现，如 macosx系统上的实现为`src/jdk.attach/macosx/classes/sun/tools/attach/VirtualMachineImpl.java`。
+它也是一个抽象类，在不同操作系统上都有各自实现。
+
+如macosx系统上的实现为`src/jdk.attach/macosx/classes/sun/tools/attach/VirtualMachineImpl.java`。
+
+> 无特殊说明，本书源码基于JDK11
 
 先来看下`HotSpotVirtualMachine`抽象类的loadAgentLibrary方法
 ```java
@@ -324,23 +328,23 @@ n byte arg2
 n byte arg3
 1 byte '\0'
 ```
-## 2.2 Attach服务端源码解析
+### 3.2.2 Attach服务端源码解析
 
 我们再来看下接收Attach命令的服务端代码是怎么样，这部分代码是c/c++语言构建，但是也是不难理解的。以Linux系统为例子，说明目标JVM如何处理Attach请求和命令。
 
 先来看下目标JVM如何处理`kill -3`信号。JVM初始化过程中会创建2个线程，线程名称分别为`Signal Dispatcher`和`Attach Listener`，Signal Dispatcher线程用来处理信号量，Attach Listener线程用来响应Attach操作。JVM线程的的初始化都在`Threads::create_vm`中，当然与Attach有关的线程也在这个方法中初始化。
+
+> TODO 源码位置
 
 ```src/hotspot/share/runtime/thread.cpp
 jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
   //....其他代码省略
 
-  // Signal Dispatcher needs to be started before VMInit event is posted
-  // step1：初始化 Signal Dispatcher 线程支持信号量处理
+  // 初始化 Signal Dispatcher 线程支持信号量处理
   os::initialize_jdk_signal_support(CHECK_JNI_ERR);
 
-  // Start Attach Listener if +StartAttachListener or it can't be started lazily
-  // step2：初始化Attach Listener线程
+  // 初始化Attach Listener线程
   if (!DisableAttachMechanism) {
     // 在VM启动时删除已经存在的通信文件.java_pid<pid>
     AttachListener::vm_start();
@@ -350,12 +354,12 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     }
   }
   
-  //....
+  //....其他代码省略
 }  
 ```
 上面的代码中分别初始化Signal Dispatcher、Attach Listener，并且Signal Dispatcher先于Attach Listener初始化。下面分别详细说下初始化流程。
 
-### 2.2.1 Signal Dispatcher
+#### 3.2.2.1 Signal Dispatcher
 
 `initialize_jdk_signal_support`的实现代码如下
 
@@ -363,13 +367,13 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 // 初始化jdk的信号支持系统
 void os::initialize_jdk_signal_support(TRAPS) {
   if (!ReduceSignalUsage) {
-    // Setup JavaThread for processing signals
-    // 线程名称
+  
+    // 线程名称 Signal Dispatcher
     const char thread_name[] = "Signal Dispatcher";
     
     // ... 线程初始化过程
 
-    // 设置线程入口
+    // 设置线程入口 signal_thread_entry
     JavaThread* signal_thread = new JavaThread(&signal_thread_entry);
     
     // ...
@@ -380,15 +384,14 @@ void os::initialize_jdk_signal_support(TRAPS) {
   }
 }
 ```
-JVM创建了一个单独的线程来实现信号处理，这个线程名称为Signal Dispatcher。线程的入口是signal_thread_entry函数。入口函数代码如下：
+JVM创建了一个单独的线程来实现信号处理，这个线程名称为Signal Dispatcher。该线程的入口是signal_thread_entry函数。入口函数代码如下：
 
 ```src/hotspot/share/runtime/os.cpp
-// SIGBREAK is sent by the keyboard to query the VM state
 #ifndef SIGBREAK
-// SIGBREAK就是SIGQUIT
-#define SIGBREAK SIGQUIT  
+#define SIGBREAK SIGQUIT  // SIGBREAK就是SIGQUIT
 #endif
 
+// Signal Dispatcher线程的入口
 static void signal_thread_entry(JavaThread* thread, TRAPS) {
   os::set_priority(thread, NearMaxPriority);
   // 处理信号
@@ -405,16 +408,10 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
     switch (sig) {
       case SIGBREAK: {
         // 当接收到SIGBREAK信号，就执行接下来的代码
-        // Check if the signal is a trigger to start the Attach Listener - in that
-        // case don't print stack traces.
         // 检测是否禁用了attach机制，AttachListener是否已经初始化完成
         if (!DisableAttachMechanism && AttachListener::is_init_trigger()) {
           continue;
         }
-        // Print stack traces
-        // Any SIGBREAK operations added here should make sure to flush
-        // the output stream (e.g. tty->flush()) after output.  See 4803766.
-        // Each module also prints an extra carriage return after its output.
         
         // 如果attach机制被禁用或者attach_pid不存在，
         // 则会创建VM_PrintThreads、VM_PrintJNI、VM_FindDeadlocks，
@@ -426,6 +423,7 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
         VM_FindDeadlocks op1(tty);
         VMThread::execute(&op1);
         Universe::print_heap_at_SIGBREAK();
+        
         // 启用-XX:+PrintClassHistogram,执行一次fullgc
         if (PrintClassHistogram) {
           VM_GC_HeapInspection op1(tty, true /* force full GC before heap inspection */);
@@ -444,14 +442,14 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
   }
 }
 ```
-代码行号2～5定义了宏SIGBREAK，可以看出，SIGBREAK信号就是SIGQUIT。DisableAttachMechanism禁止attach，默认为false。下面是DisableAttachMechanism的含义
+代码行号1～3定义了宏SIGBREAK，可以看出，SIGBREAK信号就是SIGQUIT。代码23行的DisableAttachMechanism参数可以禁止attach，默认为false。下面是DisableAttachMechanism的含义
 
 ```text
 product(bool, DisableAttachMechanism, false,                              \
 "Disable mechanism that allows tools to attach to this VM")
 ```
 
-再来看下`AttachListener::is_init_trigger`的实现
+再来看下`AttachListener::is_init_trigger`的实现。
 ```
 // If the file .attach_pid<pid> exists in the working directory
 // or /tmp then this is the trigger to start the attach mechanism
@@ -497,12 +495,12 @@ bool AttachListener::is_init_trigger() {
 
 如果AttachListener没有初始化，则判断临时目录下.attach_pid<pid>文件是否存在，如果存在则调用init初始化AttachListener线程，初始化成功后返回true。
 
-因此Attach机制在Linux系统的流程可以描述为下图。
+因此Attach机制在Linux系统的流程可以描述为下图3-2。
 ![attach机制](images/attach机制大致流程.png)
 
 
-### 2.2.2 Attach Listener
-Attach机制通过Attach Listener线程来进行相关命令的处理，下面来看一下Attach Listener线程是如何初始化的。从上面的代码分析可以看出，AttachListener可以在JVM启动时初始化，也可以在首次收到SIGBREAK信号后，由Signal Dispatcher完成初始化。在JVM启动时初始化之前执行`AttachListener::vm_start`，删除已经存在的通信文件.java_pid文件。
+#### 3.2.2.2 Attach Listener
+Attach机制通过Attach Listener线程来进行相关命令的处理，下面来看一下Attach Listener线程是如何初始化的。从上面的代码分析可以看出，AttachListener可以在JVM启动时初始化，也可以在首次收到SIGBREAK信号后，由Signal Dispatcher完成初始化。在JVM启动时初始化之前执行`AttachListener::vm_start`，删除已经存在的通信文件.java_pid<pid>文件。
 
 ```c++
 void AttachListener::vm_start() {
@@ -524,7 +522,7 @@ void AttachListener::vm_start() {
 }
 ```
 这个删除文件的操作仅在JVM启动是执行一次，因为操作系统层面进程的PID是可以复用的，
-防止已经退出的进程影响当前的进程初始化Attach Listener。
+防止已经退出的进程影响当前的JVM进程初始化Attach Listener。
 
 再来看下Attach Listener初始化过程。
 ```text
@@ -573,7 +571,7 @@ static void attach_listener_thread_entry(JavaThread* thread, TRAPS) {
 第一步先执行AttachListener socket的初始化操作；第二步初始化完成后设置
 AttachListener的状态为initialized；第三步从队列中取AttachOperation，并且调用对应的处理函数处理并返回结果。下面分别对这个三个过程详细分析。
 
-#### AttachListener::pd_init
+##### AttachListener::pd_init
 执行初始化操作在AttachListener::pd_init方法中。
 ```text
 int AttachListener::pd_init() {
@@ -587,7 +585,7 @@ int AttachListener::pd_init() {
 }
 ```
 实际执行的是LinuxAttachListener::init，不同操作系统执行初始化逻辑不同。在Linux系统中实际执行LinuxAttachListener::init。
-```text
+```c++
 // 创建了一个socket并监听socket文件
 int LinuxAttachListener::init() {
   char path[UNIX_PATH_MAX];          // socket file
@@ -650,7 +648,7 @@ int LinuxAttachListener::init() {
 ```
 AttachListener::pd_init()方法调用了LinuxAttachListener::init()方法，完成了套接字的创建和监听。
 
-#### LinuxAttachListener::dequeue
+##### LinuxAttachListener::dequeue
 
 for循环的执行逻辑，大概是这样的：
 + 从dequeue拉取一个需要执行的任务；
@@ -699,7 +697,7 @@ dequeue方法是一个for循环，会循环使用accept方法，接受socket中�
 执行read_request方法，从socket读取内容，并且把内容包装成AttachOperation类的一个实例。
 
 接下来看看read_request是如何解析socket数据流的。
-```text
+```c++
 LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
   // 协议版本
   char ver_str[8];
@@ -802,35 +800,33 @@ LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
 这是Linux上的实现，不同的操作系统实现方式不一样。上面的代码Attach Listener在某个端口监听着，通过accept来接收一个连接，然后从这个连接里面将请求读取出来，然后将请求包装成一个AttachOperation类型的对象，之后就会从表里查询对应的处理函数，然后进行处理。
 
 
-进程间详细的交互流程可以用下面的流程图描述：
+进程间详细的交互流程可以用下面的图3-3描述。
 
 ![attach机制](images/attach详细流程.png)
 
 
+### 3.2.3 Attach机制涉及到的JVM参数
 
-### 2.2.3 Attach机制涉及到的JVM参数
+这里重新总结下Attach机制涉及到JVM参数。如下表3-1所示。
 
-这里重新总结下attach机制涉及到JVM参数
+表3-1 Attach机制相关的JVM参数
 
-
-| 名称 | 含义                      | 默认值   |
-|----|-------------------------|-------|
-| ReduceSignalUsage | 减少信号使用                  | false |
-| DisableAttachMechanism | 禁止attach到当前JVM          | false |
+| 名称 | 含义                       | 默认值   |
+|----|--------------------------|-------|
+| ReduceSignalUsage | 禁止信号量使用                  | false |
+| DisableAttachMechanism | 禁止attach到当前JVM           | false |
 | StartAttachListener | JVM 启动时初始化AttachListener | false |
-| EnableDynamicAgentLoading | 允许运行时加载Agent            | true  |
+| EnableDynamicAgentLoading | 允许运行时加载Agent             | true  |
 
 JVM 参数都在`src/hotspot/share/runtime/globals.hpp` 中定义
 
-# 3. Attach开源工具
+## 3.3 Attach开源工具
 
-## 3.1 使用golang实现Attach注入工具
+### 3.3.1 使用golang实现Attach注入工具
 
-上一节中，详细分析了Attach通信建立和发送数据全过程，本节将使用Golang语言构建实现一个轻量级的Attach工具，并使用Attach工具获取目标JVM的堆栈信息。
+上一节中，详细分析了Attach通信建立和发送数据全过程，本节将使用Golang语言构建实现一个轻量级的Attach工具，并使用Attach工具获取目标JVM的堆栈信息。代码来源于开源项目：https://github.com/tokuhirom/go-hsperfdata
 
-代码并非笔者首创，而是来源于开源项目：https://github.com/tokuhirom/go-hsperfdata
-
-### 3.1.1 建立通信
+#### 3.3.1.1 建立通信
 
 代码位于`attach/attach_linux.go`中
 
@@ -910,7 +906,7 @@ func exists(name string) bool {
 
 上面的`force_attach`方法创建attach_pid 文件并向 目标JVM发送kill -3信号；
 
-### 3.1.2 发送命令和参数
+#### 3.3.1.2 发送命令和参数
 
 ```go
 package attach
@@ -1056,7 +1052,7 @@ func (sock *Socket) write(bytes []byte) error {
 ```
 上面代码主要功能是`Execute`方法, 该方法向socket写入上指定的字符序列。
 
-### 3.1.3 获取目标jvm的堆栈信息
+#### 3.3.1.3 获取目标jvm的堆栈信息
 再来看下main方法，接受pid参数并dump目标jvm的堆栈信息
 ```go
 package main
@@ -1139,9 +1135,9 @@ _java_thread_list=0x00007fc8a5f83fe0, length=11, elements={
 // 篇幅有限省略...
 ```
 
-## 3.2 jattach 开源工具
+## 3.4 jattach 开源工具
 
-### 3.2.1 简介
+### 3.4.1 简介
 jattach是一个不依赖于jdk/jre的运行时注入工具，并且具备jmap、jstack、jcmd和jinfo等功能，
 同时支持linux、windows、macos等操作系统。项目地址：https://github.com/jattach/jattach
 
@@ -1158,7 +1154,7 @@ jattach是一个不依赖于jdk/jre的运行时注入工具，并且具备jmap�
 + printflag：输出JVM系统参数
 + jcmd： 执行jcmd命令
 
-### 3.2.2 源码解析
+### 3.4.2 源码解析
 
 ```src/posix/jattach.c
 int jattach(int pid, int argc, char** argv) {
@@ -1383,11 +1379,11 @@ int jattach_hotspot(int pid, int nspid, int argc, char** argv) {
 ```
 jattach 给我们编译了各种平台的可执行文件，对于构建跨平台运行时注入工具很有用。我们仅需要使用即可，无需关心里面的实现。
 
-# 4.attach 的常见坑
+## 3.4.attach 的常见坑
 
-## 1.不同版本JDK在Attach成功后返回结果差异性
+### 1.不同版本JDK在Attach成功后返回结果差异性
 
-### 现象
+#### 现象
 
 当使用JDK11去attach JDK8应用时，会抛异常com.sun.tools.attach.AgentLoadException: 0 ，
 但实际上已经attach成功了。异常结果如下：
@@ -1406,7 +1402,7 @@ com.sun.tools.attach.AgentLoadException: 0
 
 ```
 
-### 原因
+#### 原因
 
 在不同的JDK中HotSpotVirtualMachine#loadAgentLibrary的返回值不一样 ，
 在JDK8中返回0表示attach成功。
@@ -1434,7 +1430,7 @@ private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String op
 
 JDK11返回的是"return code: 0"表示attach成功。
 
-```text
+```java
 private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options) 
     throws AgentLoadException, AgentInitializationException, IOException 
 {   
@@ -1461,7 +1457,7 @@ private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String op
 } 
 ```
 
-### 方案
+####  方案
 
 发起Attach的进程需要兼容不同版本JDK返回结果。下面是arthas诊断工具对这个问题的兼容性处理方案：
 
@@ -1496,9 +1492,9 @@ try {
 当抛出的异常是AgentLoadException并且message的值为"0"时，表示该异常是由于高版本Attach API attach 到低版本JDK导致。对于其他异常，抛出即可。
 
 
-## 2. java_pid<pid>文件被删除
+### .java_pid<pid>文件被删除
 
-### 现象
+#### 现象
 
 当执行attach命令如jstack时，出现报错Unable to open socket file: target process not responding or HotSpot VM not loaded
 
@@ -1517,14 +1513,14 @@ ls: .java_pid3000: No such file or directory
 
 然而，重启Java进程之后又可以使用jstack等attach工具了
 
-### 原因
+#### 原因
 
 很不幸，这是一个JDK的bug，原因是JVM在首次被attach时会创建.java_pid<pid>用于socket通信，
 文件/tmp目录下（不同操作系统tmp目录位置不同，Linux 系统为/tmp 目录），该目录不可以被参数修改。
 在Attach listener初始化过程中，这个文件首次被创建后，JVM会标记Attach Listener为initialized状态，
 如果文件被删除了，这个Java进程无法被Attach。
 
-### 方案
+#### 方案
 
 + 对于JDK8来说，只能重启进程；
 + 社区的讨论以及官方修复；
@@ -1558,9 +1554,9 @@ if (cur_state == AL_INITIALIZING) {
 ```
 需要说明的是，该修复仅限JDK11高版本。
 
-## 3.attach进程的权限问题
+### attach进程的权限问题
 
-### 现象
+#### 现象
 
 如果在root用户下执行jstack，而目标JVM进程不是root权限启动，执行报错如下：
 
@@ -1569,7 +1565,7 @@ Unable to open socket file: target process not responding or HotSpot VM not load
 The -F option can be used when the target process is not responding
 ```
 
-### 原因
+#### 原因
 
 在JDK8上会严格校验发起attach进程的uid、gid，是否与目标JVM 一致。
 
@@ -1677,13 +1673,13 @@ bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
 }
 ```
 
-### 解决方案
+#### 解决方案
 
 切换到与用户相同权限执行然后再执行Attach。 在介绍jattach工具时已经对这部分代码做了详细分析，这里不在赘述。
 
-## 4.com.sun.tools.attach.AttachNotSupportedException: no providers installed
+### com.sun.tools.attach.AttachNotSupportedException: no providers installed
 
-### 原因以及解决方案
+#### 原因以及解决方案
 是因为引的包有问题，本地装了JDK的话，可以这样引用tools.jar
 ```text
 <dependency>
