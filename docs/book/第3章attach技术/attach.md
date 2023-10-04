@@ -1,20 +1,22 @@
 # Attach机制
 
 Attach机制从JDK1.6开始引入， 主要是给运行中的Java进程注入一个Java Agent。
-Java Agent有着广泛的使用场景， 如运行时性能诊断工具Arthas和JProfiler都使用了该技术。
+Java Agent有着广泛的使用场景， 如 Java性能诊断工具jstack、jmap 和Arthas等都使用了该技术。
 
 本章将从Attach API的基本使用、实现原理、开源工具和常见的坑等几个方面介绍Attach技术。
 
-## 3.1 Attach API 介绍
+## 3.1 Attach API 简介
 从JDK1.6开始可以使用Attach API连接到目标JVM上并让目标JVM加载一个Java Agent。
 Attach API的包名称为`com.sun.tools.attach`。如下图3-1所示主要包含2个类：VirtualMachine和VirtualMachineDescriptor。
-VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，提供了获取当前主机上的JVM列表功能、Attach动作和Detach动作等。
-VirtualMachineDescriptor则是一个描述虚拟机的类，配合VirtualMachine类完成各种功能。
 
 ![图3-1 Attach API 官方文档](images/图3-1 Attach API 官方文档.png)
 图3-1 Attach API 官方文档
 
-主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面将重点介绍VirtualMachine类的使用。
+VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，而VirtualMachineDescriptor用来描述虚拟机信息，配合VirtualMachine类完成各种功能。
+
+主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面将重点介绍VirtualMachine类的使用。下面的代码使用Attach API连接到进程pid为72695的JVM进程上，然后读取目标JVM的系统参数并输出到终端，最后调用detach与目标JVM断开连接。
+
+> 代码清单3-1
 
 ```java
 import java.util.Properties;
@@ -38,13 +40,10 @@ public class Main {
     }
 }
 ```
-上面的代码使用Attach API连接到进程pid为72695的Java进程上，
-然后读取目标JVM的系统参数并输出到终端，最后调用detach与目标JVM断开连接。
+上面代码输出目标JVM的系统属性参数，其结果如代码清单3-2。
 
-从代码层面可以直观的理解，在执行完成Attach之后，就获得了一个目标JVM的VirtualMachine对象，
-调用VirtualMachine对象的方法就可以完成对目标JVM的操作。
+> 代码清单3-2
 
-上面代码的输出结果如下：
 ```
 java.runtime.name=Java(TM) SE Runtime Environment
 java.protocol.handler.pkgs=org.springframework.boot.loader
@@ -54,7 +53,10 @@ java.vm.vendor=Oracle Corporation
 // ... 其他参数省略
 ```
 
-VirtualMachine的方法有：
+在代码清单3-1第9行处，可以直观的理解在调用attach方法之后，就获得了一个目标JVM的VirtualMachine对象，调用VirtualMachine对象的方法（如代码第 12 行处，调用getSystemProperties方法）就可以完成对目标JVM的操作。除了获取目标 JVM 系统参数的方法之外，VirtualMachine还有如下方法，如代码清单3-3所示。
+
+> 代码清单3-3
+
 ```text
 // 列出当前主机上的所有JVM
 public static List<VirtualMachineDescriptor> list()
@@ -68,33 +70,27 @@ public abstract void loadAgentPath(String agentPath, String options)
 public void loadAgentPath(String agentPath)
 public abstract void loadAgent(String agent, String options)
 public void loadAgent(String agent)
-// 获取系统参数
+// 获取JVM系统参数
 public abstract Properties getSystemProperties() throws IOException
 public abstract Properties getAgentProperties() throws IOException
-// 启动JMX Agent
+// 在目标虚拟机中启动JMX管理代理
 public abstract void startManagementAgent(Properties agentProperties) throws IOException
 public abstract String startLocalManagementAgent() throws IOException;
 ```
 
 ## 3.2 实现原理
-在上一节介绍了Attach API的基本使用，本节将结合JDK源代码详细分析其中的实现原理。
-Attach机制本质上是进程间的通信，外部进程通过JVM提供的socket连接到目标JVM上并发送指令，
-目标JVM接受并处理指令然后返回处理结果。
-可能会比较奇怪，Attach时并没有发现JVM创建socket端口，其实JVM使用了Unix Domain Socket。
+在上一节介绍了Attach API的基本使用，本节将结合JDK源码分析其中的原理。Attach机制本质上是进程间的通信，外部进程通过JVM提供的socket连接到目标JVM上并发送指令，目标JVM接受并处理指令然后返回处理结果。
 
 ### 3.2.1 Attach客户端源码解析
 
-有了前面一节的使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`com.sun.tools.attach.VirtualMachine`是抽象类，
-不同厂商的虚拟机可以实现不同VirtualMachine子类，
-HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，
-它也是一个抽象类，在不同操作系统上都有各自实现。
-
-如macosx系统上的实现为`src/jdk.attach/macosx/classes/sun/tools/attach/VirtualMachineImpl.java`。
-
-> 无特殊说明，本书源码基于JDK11
+有了前面一节的使用API使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`com.sun.tools.attach.VirtualMachine`是抽象类，不同厂商的虚拟机可以实现不同VirtualMachine子类，HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，它也是一个抽象类，在不同操作系统上都有各自实现，如Linux系统上的实现为VirtualMachineImpl为VirtualMachineImpl。VirtualMachineImpl类的的继承关系如下图3-2所示：
+![截屏2023-10-04 下午7.13.30.png](images%2F%E6%88%AA%E5%B1%8F2023-10-04%20%E4%B8%8B%E5%8D%887.13.30.png)
+![图3-2 VirtualMachineImpl继承关系.png](images%2F%E5%9B%BE3-2%20VirtualMachineImpl%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png)
+图3-2 VirtualMachineImpl类的继承关系
 
 先来看下`HotSpotVirtualMachine`抽象类的loadAgentLibrary方法
 ```java
+
 private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options)
     throws AgentLoadException, AgentInitializationException, IOException
 {
@@ -137,8 +133,9 @@ abstract InputStream execute(String cmd, Object ... args)
 ```
 execute是一个抽象方法，需要在子类中实现，HotSpotVirtualMachine类中的其他方法大多数最终都会调用这个execute方法。
 
-再来看下macosx系统上的子类`VirtualMachineImpl`代码。
-``` java           
+再来看下Linux系统上的实现类`VirtualMachineImpl`代码。
+``` java    
+// 代码位置：src/jdk.attach/linux/classes/sun/tools/attach/VirtualMachineImpl.java
 VirtualMachineImpl(AttachProvider provider, String vmid)
     throws AttachNotSupportedException, IOException
 {
@@ -295,17 +292,21 @@ InputStream execute(String cmd, Object ... args) throws AgentLoadException, IOEx
 strace -f java Main 2> main.out
 ```
 
-在 main.out 文件中找到attach通信过程，可以看到先写入协议号、命令、参数，然后读取返回结果。
+在 main.out 文件中找到attach通信过程，从开始写入部分可以看出依次先写入协议号、命令、命令参数，
+然后读取返回结果。
 ```text
+// 建立UDS链接
 [pid 31412] socket(AF_LOCAL, SOCK_STREAM, 0) = 6
 [pid 31412] connect(6, {sa_family=AF_LOCAL, sun_path="/tmp/.java_pid27730"}, 110) = 0
-[pid 31412] write(6, "1", 1)            = 1
+// 开始写入
+[pid 31412] write(6, "1", 1)            = 1   // 协议号
+[pid 31412] write(6, "\0", 1)           = 1   // 分割符号
+[pid 31412] write(6, "properties", 10)  = 10  // 命令
+[pid 31412] write(6, "\0", 1)           = 1   // 分割符号
+[pid 31412] write(6, "\0", 1 <unfinished ...> 
 [pid 31412] write(6, "\0", 1)           = 1
-[pid 31412] write(6, "properties", 10)  = 10
 [pid 31412] write(6, "\0", 1)           = 1
-[pid 31412] write(6, "\0", 1 <unfinished ...>
-[pid 31412] write(6, "\0", 1)           = 1
-[pid 31412] write(6, "\0", 1)           = 1
+// 读取返回结果
 [pid 31412] read(6, "0", 1)             = 1
 [pid 31412] read(6, "\n", 1)            = 1
 [pid 31412] read(6, "#Thu Jul 27 17:52:11 CST 2023\nja"..., 128) = 128
@@ -315,7 +316,7 @@ strace -f java Main 2> main.out
 [pid 31412] read(6, "e=Java Virtual Machine Specifica"..., 128) = 128
 ```
 
-因此发送协议可以总结为下面的字符串序列：
+因此Attach客户端的发送协议可以总结为下面的字符串序列，字符串
 ```text
 1 byte PROTOCOL_VERSION
 1 byte '\0'
@@ -330,42 +331,55 @@ n byte arg3
 ```
 ### 3.2.2 Attach服务端源码解析
 
-我们再来看下接收Attach命令的服务端代码是怎么样，这部分代码是c/c++语言构建，但是也是不难理解的。以Linux系统为例子，说明目标JVM如何处理Attach请求和命令。
+我们再来看下接收attach命令的服务端是如何实现的，这部分代码是c/c++语言，但是也是不难理解的。
+以Linux系统为例子，说明目标JVM如何处理Attach请求和执行指定的命令。
 
-先来看下目标JVM如何处理`kill -3`信号。JVM初始化过程中会创建2个线程，线程名称分别为`Signal Dispatcher`和`Attach Listener`，Signal Dispatcher线程用来处理信号量，Attach Listener线程用来响应Attach操作。JVM线程的的初始化都在`Threads::create_vm`中，当然与Attach有关的线程也在这个方法中初始化。
+Linux系统下Attach机制信号与线程的创建流程可以描述为下图3-2。
+![图3-2 Attach机制信号与线程的处理流程](images/图3-2 Attach机制信号与线程的处理流程.png)
+图3-2 Attach机制信号与线程的处理流程
 
-> TODO 源码位置
+
+先来看下目标JVM如何处理`kill -3`信号。JVM初始化过程中会创建2个线程，线程名称分别为`Signal Dispatcher`和`Attach Listener`，Signal Dispatcher线程用来处理信号量，Attach Listener线程用来响应Attach请求。
+
+JVM线程的的初始化都在`Threads::create_vm`中，当然与Attach有关的线程也在这个方法中初始化。
 
 ```src/hotspot/share/runtime/thread.cpp
+// 代码位置 src/hotspot/share/runtime/thread.cpp
 jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
-  //....其他代码省略
+  // 参数和系统初始化，省略....
 
-  // 初始化 Signal Dispatcher 线程支持信号量处理
+  // 初始化Signal Dispatcher线程支持信号量处理
   os::initialize_jdk_signal_support(CHECK_JNI_ERR);
 
-  // 初始化Attach Listener线程
+  // 目标JVM没有禁用Attach机制
   if (!DisableAttachMechanism) {
-    // 在VM启动时删除已经存在的通信文件.java_pid<pid>
+  	// 在JVM启动时删除已经存在的通信文件.java_pid<pid>
     AttachListener::vm_start();
+    
+    // 如果JVM启动参数设置-XX:+StartAttachListener或者
+    // 减少了信号量的使用而不能延迟启动，则在JVM启动时初始化Attach Listener
+    // 默认情况下AttachListener是延迟启动模式，即在JVM启动时不会立即创建Attach Listener线程
     if (StartAttachListener || AttachListener::init_at_startup()) {
-      // StartAttachListener 在JVM启动时初始化AttachListener线程
+      // 初始化Attach Listener线程
       AttachListener::init();
     }
   }
   
-  //....其他代码省略
+  // 参数和系统初始化，省略....
 }  
 ```
-上面的代码中分别初始化Signal Dispatcher、Attach Listener，并且Signal Dispatcher先于Attach Listener初始化。下面分别详细说下初始化流程。
+上面的代码中分别初始化Signal Dispatcher和Attach Listener线程，Signal Dispatcher在JVM 启动时初始化，Attach Listener则延迟初始化。下面分别详细说下各自的初始化流程。
 
-#### 3.2.2.1 Signal Dispatcher
+#### 3.2.2.1 Signal Dispatcher线程
 
-`initialize_jdk_signal_support`的实现代码如下
+`initialize_jdk_signal_support`的实现代码如下所示：
 
 ```src/hotspot/share/runtime/os.cpp
-// 初始化jdk的信号支持系统
+// 代码位置 src/hotspot/share/runtime/os.cpp
+// 初始化JDK的信号支持系统
 void os::initialize_jdk_signal_support(TRAPS) {
+  // 没有禁止信号量的使用
   if (!ReduceSignalUsage) {
   
     // 线程名称 Signal Dispatcher
@@ -378,13 +392,16 @@ void os::initialize_jdk_signal_support(TRAPS) {
     
     // ...
     
-    // 注册的信号
-    // Handle ^BREAK
+    // 注册SIGBREAK信号处理handler
     os::signal(SIGBREAK, os::user_handler());
   }
 }
 ```
-JVM创建了一个单独的线程来实现信号处理，这个线程名称为Signal Dispatcher。该线程的入口是signal_thread_entry函数。入口函数代码如下：
+JVM创建了一个单独的线程来实现信号处理，这个线程名称为Signal Dispatcher。该线程的入口是signal_thread_entry函数。入口函数代码：
+
+代码清单：Signal Dispatcher线程的入口
+
+代码位置 src/hotspot/share/runtime/os.cpp
 
 ```src/hotspot/share/runtime/os.cpp
 #ifndef SIGBREAK
@@ -398,35 +415,37 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
   while (true) {
     int sig;
     {
-      sig = os::signal_wait();
+      sig = os::signal_wait(); //阻塞等待信号
     }
     if (sig == os::sigexitnum_pd()) {
-       // Terminate the signal thread
+       // 停止Signal Dispatcher信号处理线程
        return;
     }
     
+    // 循环处理各种信号
     switch (sig) {
+    	// 当接收到SIGBREAK信号，就执行接下来的代码
       case SIGBREAK: {
-        // 当接收到SIGBREAK信号，就执行接下来的代码
-        // 检测是否禁用了attach机制，AttachListener是否已经初始化完成
+        
+        // 如果没有禁用attach机制并且是attach请求则初始化AttachListener
+        // 如果AttachListener没有初始化，则进行初始化并返回true
         if (!DisableAttachMechanism && AttachListener::is_init_trigger()) {
           continue;
         }
         
-        // 如果attach机制被禁用或者attach_pid不存在，
-        // 则会创建VM_PrintThreads、VM_PrintJNI、VM_FindDeadlocks，
-        // 通过VMThread::execute()方法扔到VM Thread线程的VMOperationQueue队列。
+        // 如果上面条件不满足，则打印线程栈等信息
         VM_PrintThreads op;
-        VMThread::execute(&op);
+        VMThread::execute(&op);    // 线程栈信息
         VM_PrintJNI jni_op;
-        VMThread::execute(&jni_op);
+        VMThread::execute(&jni_op);// JNI global references数量
         VM_FindDeadlocks op1(tty);
-        VMThread::execute(&op1);
-        Universe::print_heap_at_SIGBREAK();
+        VMThread::execute(&op1);   // 死锁信息
+        Universe::print_heap_at_SIGBREAK(); // 堆、元空间的使用占比
         
-        // 启用-XX:+PrintClassHistogram,执行一次fullgc
+        // 启用-XX:+PrintClassHistogram，则强制执行一次full GC
         if (PrintClassHistogram) {
-          VM_GC_HeapInspection op1(tty, true /* force full GC before heap inspection */);
+          // 下面的true表示force full GC before heap inspection
+          VM_GC_HeapInspection op1(tty, true);
           VMThread::execute(&op1);
         }
         if (JvmtiExport::should_post_data_dump()) {
@@ -442,89 +461,54 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
   }
 }
 ```
-代码行号1～3定义了宏SIGBREAK，可以看出，SIGBREAK信号就是SIGQUIT。代码23行的DisableAttachMechanism参数可以禁止attach，默认为false。下面是DisableAttachMechanism的含义
-
-```text
-product(bool, DisableAttachMechanism, false,                              \
-"Disable mechanism that allows tools to attach to this VM")
-```
+代码行号1～3定义了宏SIGBREAK，可以看出，SIGBREAK信号就是SIGQUIT。代码26行的DisableAttachMechanism参数可以禁止attach，默认为false，即允许attach。
 
 再来看下`AttachListener::is_init_trigger`的实现。
 ```
-// If the file .attach_pid<pid> exists in the working directory
-// or /tmp then this is the trigger to start the attach mechanism
+// 如果在JVM工作目录或者/tmp目录下存在文件.attach_pid<pid>
+// 表示是启动attach机制
 bool AttachListener::is_init_trigger() {
   // 记录AttachListener的初始状态
-  // JVM 用一个全局变量_is_initialized记录 AttachListener 的状态
+  // JVM 用一个全局变量_is_initialized记录AttachListener 的状态
   if (init_at_startup() || is_initialized()) {
-    return false;               // initialized at startup or already initialized
+    // AttachListener在JVM启动时已经初始化或者已经是初始化的状态
+    return false;               
   }
+  
+  // 检查.attach_pid<pid>是否存在
   char fn[PATH_MAX + 1];
   int ret;
   struct stat64 st;
-  // .attach_pid%d 文件
   sprintf(fn, ".attach_pid%d", os::current_process_id());
   RESTARTABLE(::stat64(fn, &st), ret);
   if (ret == -1) {
-    log_trace(attach)("Failed to find attach file: %s, trying alternate", fn);
-    snprintf(fn, sizeof(fn), "%s/.attach_pid%d",
-             os::get_temp_directory(), os::current_process_id());
-    RESTARTABLE(::stat64(fn, &st), ret);
-    if (ret == -1) {
-      log_debug(attach)("Failed to find attach file: %s", fn);
-    }
+    // .attach_pid<pid>文件不存在，打印日志，代码省略...
   }
+  
   // 当前进程的.attach_pid<pid>文件存在，创建AttachListener线程
   if (ret == 0) {
-    // simple check to avoid starting the attach mechanism when
-    // a bogus non-root user creates the file
     // attach文件权限校验（root权限或者权限相同）
     if (os::Posix::matches_effective_uid_or_root(st.st_uid)) {
       // 创建AttachListener线程
-      // 执行AttachListener的init方法
       init();
-      log_trace(attach)("Attach triggered by %s", fn);
       return true;
-    } else {
-      log_debug(attach)("File %s has wrong user id %d (vs %d). Attach is not triggered", fn, st.st_uid, geteuid());
-    }
+    } 
   }
   return false;
 }
 ```
 
-如果AttachListener没有初始化，则判断临时目录下.attach_pid<pid>文件是否存在，如果存在则调用init初始化AttachListener线程，初始化成功后返回true。
-
-因此Attach机制在Linux系统的流程可以描述为下图3-2。
-![图3-2 Attach机制信号与线程的处理流程](images/图3-2 Attach机制信号与线程的处理流程.png)
-图3-2 Attach机制信号与线程的处理流程
+在Signal Dispatcher线程接收到SIGBREAK信号后，有两种处理方法，第一种是初始化AttachListener线程；第二种打印线程栈等快照信息。处理方式取决于.attach_pid<pid>握手文件是否存在，如果存在则调用AttachListener的init方法，初始化成功后返回true。
 
 #### 3.2.2.2 Attach Listener
-Attach机制通过Attach Listener线程来进行相关命令的处理，下面来看一下Attach Listener线程是如何初始化的。从上面的代码分析可以看出，AttachListener可以在JVM启动时初始化，也可以在首次收到SIGBREAK信号后，由Signal Dispatcher完成初始化。在JVM启动时初始化之前执行`AttachListener::vm_start`，删除已经存在的通信文件.java_pid<pid>文件。
+Attach机制通过Attach Listener线程来进行相关命令的处理，下面来看一下Attach Listener线程是如何初始化的。从上面的代码分析可以看出，AttachListener可以在JVM启动时（立即初始化），也可以在首次收到SIGBREAK信号后，由Signal Dispatcher线程完成初始化（延迟初始化）。
 
-```c++
-void AttachListener::vm_start() {
-  char fn[UNIX_PATH_MAX];
-  struct stat64 st;
-  int ret;
+来看下Attach Listener初始化过程。
 
-  int n = snprintf(fn, UNIX_PATH_MAX, "%s/.java_pid%d",
-           os::get_temp_directory(), os::current_process_id());
-  assert(n < (int)UNIX_PATH_MAX, "java_pid file name buffer overflow");
+>代码清单：Attach Listener初始化过程
+>
+>代码位置：src/hotspot/os/linux/attachListener_linux.cpp
 
-  RESTARTABLE(::stat64(fn, &st), ret);
-  if (ret == 0) {
-    ret = ::unlink(fn);
-    if (ret == -1) {
-      log_debug(attach)("Failed to remove stale attach pid file at %s", fn);
-    }
-  }
-}
-```
-这个删除文件的操作仅在JVM启动是执行一次，因为操作系统层面进程的PID是可以复用的，
-防止已经退出的进程影响当前的JVM进程初始化Attach Listener。
-
-再来看下Attach Listener初始化过程。
 ```text
 void AttachListener::init() {
   
@@ -568,11 +552,15 @@ static void attach_listener_thread_entry(JavaThread* thread, TRAPS) {
   }
 }
 ```
-第一步先执行AttachListener socket的初始化操作；第二步初始化完成后设置
-AttachListener的状态为initialized；第三步从队列中取AttachOperation，并且调用对应的处理函数处理并返回结果。下面分别对这个三个过程详细分析。
+第一步：先执行AttachListener socket的初始化操作；
+
+第二步：初始化完成后设置，AttachListener的状态为initialized；
+
+第三步：从队列中取AttachOperation，并且调用对应的处理函数处理并返回结果。
+
+下面分别对这个三个过程详细分析。
 
 ##### AttachListener::pd_init
-执行初始化操作在AttachListener::pd_init方法中。
 ```text
 int AttachListener::pd_init() {
   
@@ -634,7 +622,7 @@ int LinuxAttachListener::init() {
         res = ::rename(initial_path, path);
       }
     }
-  }
+  }n'n'n'h
   if (res == -1) {
     ::close(listener);
     ::unlink(initial_path);
@@ -648,15 +636,26 @@ int LinuxAttachListener::init() {
 ```
 AttachListener::pd_init()方法调用了LinuxAttachListener::init()方法，完成了套接字的创建和监听。
 
+
+
+##### AttachListener::set_initialized
+
+
+
+TODO
+
+
+
 ##### LinuxAttachListener::dequeue
 
-for循环的执行逻辑，大概是这样的：
-+ 从dequeue拉取一个需要执行的任务；
+for循环的执行逻辑，流程简略的概括为下面的步骤：
++ 从dequeue拉取一个需要执行的AttachOperation对象；
 + 查询匹配的命令处理函数；
-+ 执行匹配到的命令执行函数；
++ 执行匹配到的命令执行函数并返回结果；
 
 AttachOperation的全部操作函数表如下：
 ```text
+// 代码位置：src/hotspot/share/services/attachListener.cpp
 static AttachOperationFunctionInfo funcs[] = {
   { "agentProperties",  get_agent_properties },
   { "datadump",         data_dump },
@@ -671,8 +670,9 @@ static AttachOperationFunctionInfo funcs[] = {
   { NULL,               NULL }
 };
 ```
-对于加载Agent来说，命令就是load命令，用来加载一个Java Agent。现在，我们知道了Attach Listener大概的工作模式，但是还是不太清楚任务从哪来，这个秘密就藏在AttachListener::dequeue这行代码里面，接下来我们来分析一下dequeue这个函数：
+对于加载Agent来说，对应的命令就是上面的load。现在，我们知道了Attach Listener大概的工作模式，但是还是不太清楚任务从哪来，这个秘密就藏在AttachListener::dequeue这行代码里面，接下来我们来分析一下dequeue这个函数：
 ```text
+// 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
 LinuxAttachOperation* LinuxAttachListener::dequeue() {
   for (;;) {
     // 等待attach进程连接socket
@@ -692,93 +692,35 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
   }
 }
 ```
-dequeue方法是一个for循环，会循环使用accept方法，接受socket中传过来的数据，
-并且在验证通信的另一端的uid与gid与自身的euid与egid相同后，
-执行read_request方法，从socket读取内容，并且把内容包装成AttachOperation类的一个实例。
+dequeue方法是一个for循环，会循环使用accept方法，接受socket中传过来的数据，并且在验证通信的另一端的uid与gid与自身的euid与egid相同后，执行read_request方法，从socket读取内容，并且把内容包装成AttachOperation类的一个实例。接下来看看read_request是如何解析socket数据流的。
 
-接下来看看read_request是如何解析socket数据流的。
 ```c++
+// 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
 LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
-  // 协议版本
-  char ver_str[8];
-  sprintf(ver_str, "%d", ATTACH_PROTOCOL_VER);
-  
-  // The request is a sequence of strings so we first figure out the
-  // expected count and the maximum possible length of the request.
-  // The request is:
-  //   <ver>0<cmd>0<arg>0<arg>0<arg>0
-  // where <ver> is the protocol version (1), <cmd> is the command
-  // name ("load", "datadump", ...), and <arg> is an argument
-  int expected_str_count = 2 + AttachOperation::arg_count_max;
-  // socekt buf 的最大长度
-  // 参数最多为AttachOperation::arg_count_max
-  const int max_len = (sizeof(ver_str) + 1) + (AttachOperation::name_length_max + 1) +
-    AttachOperation::arg_count_max*(AttachOperation::arg_length_max + 1);
+  // 缓存区最大长度计算，省略...
   
   char buf[max_len];
   int str_count = 0;
+  
+  // 数据流写入buf
+  // 包括版本去掉命令数据的分割符号代码"\0"
+  // 版本协议校验等，省略...
 
-  // Read until all (expected) strings have been read, the buffer is
-  // full, or EOF.
-
-  int off = 0;
-  int left = max_len;
-
-  do {
-    int n;
-    RESTARTABLE(read(s, buf+off, left), n);
-    assert(n <= left, "buffer was too small, impossible!");
-    buf[max_len - 1] = '\0';
-    if (n == -1) {
-      return NULL;      // reset by peer or other error
-    }
-    if (n == 0) {
-      break;
-    }
-    for (int i=0; i<n; i++) {
-      if (buf[off+i] == 0) {
-        // EOS found
-        str_count++;
-        
-        // The first string is <ver> so check it now to
-        // check for protocol mis-match
-        // 第一个字符串是协议版本
-        if (str_count == 1) {
-          // 校验socket客户端、服务端的协议版本是否相同
-          if ((strlen(buf) != strlen(ver_str)) ||
-              (atoi(buf) != ATTACH_PROTOCOL_VER)) {
-            // 协议版本不相同，往socket中写入错误信息  
-            char msg[32];
-            sprintf(msg, "%d\n", ATTACH_ERROR_BADVERSION);
-            write_fully(s, msg, strlen(msg));
-            return NULL;
-          }
-        }
-      }
-    }
-    off += n;
-    left -= n;
-  } while (left > 0 && str_count < expected_str_count);
-
-  if (str_count != expected_str_count) {
-    return NULL;        // incomplete request
-  }
-
-  // parse request
   // 参数遍历
   ArgumentIterator args(buf, (max_len)-left);
 
-  // version already checked
+  // 协议版本
   char* v = args.next();
-  // 第一个参数是命令名称  
+  // 命令名称  
   char* name = args.next();
   if (name == NULL || strlen(name) > AttachOperation::name_length_max) {
     return NULL;
   }
+  
   // 创建AttachOperation对象
   LinuxAttachOperation* op = new LinuxAttachOperation(name);
   
-  // 读取参数  
+  // 从buf中读取AttachOperation参数  
   for (int i=0; i<AttachOperation::arg_count_max; i++) {
     char* arg = args.next();
     if (arg == NULL) {
@@ -791,16 +733,17 @@ LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
       op->set_arg(i, arg);
     }
   }
+  
   // 将socket引用设置到op对象中
   op->set_socket(s);
   return op;
 }
 ```
 
-这是Linux上的实现，不同的操作系统实现方式不一样。上面的代码Attach Listener在某个端口监听着，通过accept来接收一个连接，然后从这个连接里面将请求读取出来，然后将请求包装成一个AttachOperation类型的对象，之后就会从表里查询对应的处理函数，然后进行处理。
+这是Linux上的实现，不同的操作系统实现方式不一样。Attach Listener线程监听.java_pid<pid>文件，等待Attach 客户端发起连接，解析Attach 客户端的Attach request 请求信息，将请求的字节流包装成一个AttachOperation类型的对象，之后就会从表里查询对应的处理函数，然后进行处理并返回处理结果。
 
 
-进程间详细的交互流程可以用下面的图3-3描述。
+ Attach 机制详细的交互流程可以用下面的图3-3描述。
 
 ![图3-3 Attach交互处理流程](images/图3-3 Attach交互处理流程.png)
 图3-3 Attach交互处理流程
@@ -828,9 +771,8 @@ JVM 参数都在`src/hotspot/share/runtime/globals.hpp` 中定义
 
 #### 3.3.1.1 建立通信
 
-代码位于`attach/attach_linux.go`中
-
 ```go
+// 代码位置：attach/attach_linux.go
 package attach
 
 import (
@@ -842,19 +784,23 @@ import (
 	"time"
 )
 
+// 执行attach
 func force_attach(pid int) error {
+  // 进程的工作目录下创建.attach_pid<pid>文件
 	attach_file := fmt.Sprintf("/proc/%d/cwd/.attach_pid%d", pid, pid)
 	f, err := os.Create(attach_file)
 	if err != nil {
 		return fmt.Errorf("Canot create file:%v:%v", attach_file, err)
 	}
 	f.Close()
-
+	
+  // 给目标JVM发送SIGQUIT信号
 	err = syscall.Kill(pid, syscall.SIGQUIT)
 	if err != nil {
 		return fmt.Errorf("Canot send sigkill:%v:%v", pid, err)
 	}
-
+	
+  // 检查.java_pid<pid>文件是否存在
 	sockfile := filepath.Join(os.TempDir(), fmt.Sprintf(".java_pid%d", pid))
 	for i := 0; i < 10; i++ {
 		if exists(sockfile) {
@@ -865,6 +811,7 @@ func force_attach(pid int) error {
 	return fmt.Errorf("Canot attach process:%v", pid)
 }
 
+// 建立与目标JVM的UDS通信
 func GetSocketFile(pid int) (string, error) {
 	sockfile := filepath.Join(os.TempDir(), fmt.Sprintf(".java_pid%d", pid))
 	if !exists(sockfile) {
@@ -876,6 +823,7 @@ func GetSocketFile(pid int) (string, error) {
 	return sockfile, nil
 }
 
+// 创建UDS
 func New(pid int) (*Socket, error) {
 	sockfile, err := GetSocketFile(pid)
 	if err != nil {
@@ -904,7 +852,7 @@ func exists(name string) bool {
 }
 ```
 
-上面的`force_attach`方法创建attach_pid 文件并向 目标JVM发送kill -3信号；
+上面的`force_attach`方法创建attach_pid 文件并向目标JVM发送kill -3信号；
 
 #### 3.3.1.2 发送命令和参数
 
@@ -925,14 +873,16 @@ type Socket struct {
 	sock *net.UnixConn
 }
 
-func (self *Socket) Close() error {
-	return self.sock.Close()
+func (sock *Socket) Close() error {
+	return sock.sock.Close()
 }
 
+// read
 func (sock *Socket) Read(b []byte) (int, error) {
 	return sock.sock.Read(b)
 }
 
+// read
 func (sock *Socket) ReadString() (string, error) {
 	retval := ""
 	for {
@@ -969,6 +919,7 @@ func (sock *Socket) Jcmd(args ...string) (string, error) {
 	return sock.ReadString()
 }
 
+// write
 func (sock *Socket) Execute(cmd string, args ...string) error {
 	err := sock.writeString(PROTOCOL_VERSION)
 	if err != nil {
@@ -1052,7 +1003,7 @@ func (sock *Socket) write(bytes []byte) error {
 ```
 上面代码主要功能是`Execute`方法, 该方法向socket写入上指定的字符序列。
 
-#### 3.3.1.3 获取目标jvm的堆栈信息
+#### 3.3.1.3 获取目标JVM的堆栈信息
 再来看下main方法，接受pid参数并dump目标jvm的堆栈信息
 ```go
 package main
@@ -1106,21 +1057,6 @@ _java_thread_list=0x00007fc8a5f83fe0, length=11, elements={
 0x00007fc8a68e6800, 0x00007fc8a9813800, 0x00007fc8a71ac000
 }
 
-"Reference Handler" #2 daemon prio=10 os_prio=31 cpu=0.65ms elapsed=236130.66s tid=0x00007fc8a68e4800 nid=0x4a03 waiting on condition  [0x0000700001378000]
-   java.lang.Thread.State: RUNNABLE
-        at java.lang.ref.Reference.waitForReferencePendingList(java.base@11.0.2/Native Method)
-        at java.lang.ref.Reference.processPendingReferences(java.base@11.0.2/Reference.java:241)
-        at java.lang.ref.Reference$ReferenceHandler.run(java.base@11.0.2/Reference.java:213)
-
-"Finalizer" #3 daemon prio=8 os_prio=31 cpu=0.39ms elapsed=236130.66s tid=0x00007fc8a68e9800 nid=0x3503 in Object.wait()  [0x000070000147b000]
-   java.lang.Threa.State: WAITING (on object monitor)
-        at java.lang.Object.wait(java.base@11.0.2/Native Method)
-        - waiting on <0x00000007d4853f98> (a java.lang.ref.ReferenceQueue$Lock)
-        at java.lang.ref.ReferenceQueue.remove(java.base@11.0.2/ReferenceQueue.java:155)
-        - waiting to re-lock in wait() <0x00000007d4853f98> (a java.lang.ref.ReferenceQueue$Lock)
-        at java.lang.ref.ReferenceQueue.remove(java.base@11.0.2/ReferenceQueue.java:176)
-        at java.lang.ref.Finalizer$FinalizerThread.run(java.base@11.0.2/Finalizer.java:170)
-
 "Signal Dispatcher" #4 daemon prio=9 os_prio=31 cpu=12.90ms elapsed=236130.65s tid=0x00007fc8a705f000 nid=0x3c03 runnable  [0x0000000000000000]
    java.lang.Thread.State: RUNNABLE
 
@@ -1128,16 +1064,13 @@ _java_thread_list=0x00007fc8a5f83fe0, length=11, elements={
    java.lang.Thread.State: RUNNABLE
    No compile task
 
-"C1 CompilerThread0" #8 daemon prio=9 os_prio=31 cpu=1392.24ms elapsed=236130.65s tid=0x00007fc8a7062000 nid=0x5503 waiing on condition  [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-   No compile task
 
 // 篇幅有限省略...
 ```
 
-## 3.4 jattach 开源工具
+### 3.3.2 jattach
 
-### 3.4.1 简介
+#### 3.3.2.1 简介
 jattach是一个不依赖于jdk/jre的运行时注入工具，并且具备jmap、jstack、jcmd和jinfo等功能，
 同时支持linux、windows、macos等操作系统。项目地址：https://github.com/jattach/jattach
 
@@ -1154,11 +1087,11 @@ jattach是一个不依赖于jdk/jre的运行时注入工具，并且具备jmap�
 + printflag：输出JVM系统参数
 + jcmd： 执行jcmd命令
 
-### 3.4.2 源码解析
+#### 3.3.2.2 源码解析
 
 ```src/posix/jattach.c
 int jattach(int pid, int argc, char** argv) {
-    // 获取目标
+    // 获取attach进程和目标JVM进程的用户权限id
     uid_t my_uid = geteuid();
     gid_t my_gid = getegid();
     uid_t target_uid = my_uid;
@@ -1199,191 +1132,13 @@ int jattach(int pid, int argc, char** argv) {
 }
 ```
 需要注意的是，在发起attach之前，需要将attach进程的权限设置为与目标JVM权限一致。
-
-src/posix/jattach_hotspot.c
-
-```text
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/un.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <time.h>
-#include <unistd.h>
-#include "psutil.h"
-
-
-// 检查目标jvm是否已经创建了动态attach的socket文件
-// 如果对目标进程已经执行侏儒jstack、jmap等以来attach机制的命令，attach socket文件会存在
-static int check_socket(int pid) {
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s/.java_pid%d", tmp_path, pid);
-
-    struct stat stats;
-    return stat(path, &stats) == 0 && S_ISSOCK(stats.st_mode) ? 0 : -1;
-}
-
-// Check if a file is owned by current user
-static uid_t get_file_owner(const char* path) {
-    struct stat stats;
-    return stat(path, &stats) == 0 ? stats.st_uid : (uid_t)-1;
-}
-
-// Force remote JVM to start Attach listener.
-// HotSpot will start Attach listener in response to SIGQUIT if it sees .attach_pid file
-static int start_attach_mechanism(int pid, int nspid) {
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "/proc/%d/cwd/.attach_pid%d", nspid, nspid);
-
-    int fd = creat(path, 0660);
-    if (fd == -1 || (close(fd) == 0 && get_file_owner(path) != geteuid())) {
-        // Some mounted filesystems may change the ownership of the file.
-        // JVM will not trust such file, so it's better to remove it and try a different path
-        unlink(path);
-
-        // Failed to create attach trigger in current directory. Retry in /tmp
-        snprintf(path, sizeof(path), "%s/.attach_pid%d", tmp_path, nspid);
-        fd = creat(path, 0660);
-        if (fd == -1) {
-            return -1;
-        }
-        close(fd);
-    }
-
-    // We have to still use the host namespace pid here for the kill() call
-    kill(pid, SIGQUIT);
-
-    // Start with 20 ms sleep and increment delay each iteration. Total timeout is 6000 ms
-    struct timespec ts = {0, 20000000};
-    int result;
-    do {
-        nanosleep(&ts, NULL);
-        result = check_socket(nspid);
-    } while (result != 0 && (ts.tv_nsec += 20000000) < 500000000);
-
-    unlink(path);
-    return result;
-}
-
-// Connect to UNIX domain socket created by JVM for Dynamic Attach
-static int connect_socket(int pid) {
-    int fd = socket(PF_UNIX, SOCK_STREAM, 0);
-    if (fd == -1) {
-        return -1;
-    }
-
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-
-    int bytes = snprintf(addr.sun_path, sizeof(addr.sun_path), "%s/.java_pid%d", tmp_path, pid);
-    if (bytes >= sizeof(addr.sun_path)) {
-        addr.sun_path[sizeof(addr.sun_path) - 1] = 0;
-    }
-
-    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        close(fd);
-        return -1;
-    }
-    return fd;
-}
-
-// Send command with arguments to socket
-static int write_command(int fd, int argc, char** argv) {
-    // Protocol version
-    if (write(fd, "1", 2) <= 0) {
-        return -1;
-    }
-
-    int i;
-    for (i = 0; i < 4; i++) {
-        const char* arg = i < argc ? argv[i] : "";
-        if (write(fd, arg, strlen(arg) + 1) <= 0) {
-            return -1;
-        }
-    }
-    return 0;
-}
-
-// Mirror response from remote JVM to stdout
-static int read_response(int fd, int argc, char** argv) {
-    char buf[8192];
-    ssize_t bytes = read(fd, buf, sizeof(buf) - 1);
-    if (bytes == 0) {
-        fprintf(stderr, "Unexpected EOF reading response\n");
-        return 1;
-    } else if (bytes < 0) {
-        perror("Error reading response");
-        return 1;
-    }
-
-    // First line of response is the command result code
-    buf[bytes] = 0;
-    int result = atoi(buf);
-
-    // Special treatment of 'load' command
-    if (result == 0 && argc > 0 && strcmp(argv[0], "load") == 0) {
-        size_t total = bytes;
-        while (total < sizeof(buf) - 1 && (bytes = read(fd, buf + total, sizeof(buf) - 1 - total)) > 0) {
-            total += (size_t)bytes;
-        }
-        bytes = total;
-
-        // The second line is the result of 'load' command; since JDK 9 it starts from "return code: "
-        buf[bytes] = 0;
-        result = atoi(strncmp(buf + 2, "return code: ", 13) == 0 ? buf + 15 : buf + 2);
-    }
-
-#ifndef SUPPRESS_OUTPUT
-    // Mirror JVM response to stdout
-    printf("JVM response code = ");
-    do {
-        fwrite(buf, 1, bytes, stdout);
-        bytes = read(fd, buf, sizeof(buf));
-    } while (bytes > 0);
-    printf("\n");
-#endif
-
-    return result;
-}
-
-int jattach_hotspot(int pid, int nspid, int argc, char** argv) {
-    if (check_socket(nspid) != 0 && start_attach_mechanism(pid, nspid) != 0) {
-        perror("Could not start attach mechanism");
-        return 1;
-    }
-
-    int fd = connect_socket(nspid);
-    if (fd == -1) {
-        perror("Could not connect to socket");
-        return 1;
-    }
-
-#ifndef SUPPRESS_OUTPUT
-    printf("Connected to remote JVM\n");
-#endif
-
-    if (write_command(fd, argc, argv) != 0) {
-        perror("Error writing to socket");
-        close(fd);
-        return 1;
-    }
-
-    int result = read_response(fd, argc, argv);
-    close(fd);
-
-    return result;
-}
-```
-jattach 给我们编译了各种平台的可执行文件，对于构建跨平台运行时注入工具很有用。我们仅需要使用即可，无需关心里面的实现。
+jattach给我们编译了各种平台的可执行文件，对于构建跨平台运行时注入工具很有用。我们仅需要使用即可，无需关心里面的实现。
 
 ## 3.4.attach 的常见坑
 
-### 1.不同版本JDK在Attach成功后返回结果差异性
+#### 1.不同版本JDK在Attach成功后返回结果差异性
 
-#### 现象
++ 现象
 
 当使用JDK11去attach JDK8应用时，会抛异常com.sun.tools.attach.AgentLoadException: 0 ，
 但实际上已经attach成功了。异常结果如下：
@@ -1402,7 +1157,7 @@ com.sun.tools.attach.AgentLoadException: 0
 
 ```
 
-#### 原因
++ 原因
 
 在不同的JDK中HotSpotVirtualMachine#loadAgentLibrary的返回值不一样 ，
 在JDK8中返回0表示attach成功。
@@ -1457,7 +1212,7 @@ private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String op
 } 
 ```
 
-####  方案
++ 方案
 
 发起Attach的进程需要兼容不同版本JDK返回结果。下面是arthas诊断工具对这个问题的兼容性处理方案：
 
@@ -1492,9 +1247,9 @@ try {
 当抛出的异常是AgentLoadException并且message的值为"0"时，表示该异常是由于高版本Attach API attach 到低版本JDK导致。对于其他异常，抛出即可。
 
 
-### .java_pid<pid>文件被删除
+#### .java_pid<pid>文件被删除
 
-#### 现象
++ 现象
 
 当执行attach命令如jstack时，出现报错Unable to open socket file: target process not responding or HotSpot VM not loaded
 
@@ -1513,14 +1268,14 @@ ls: .java_pid3000: No such file or directory
 
 然而，重启Java进程之后又可以使用jstack等attach工具了
 
-#### 原因
++ 原因
 
 很不幸，这是一个JDK的bug，原因是JVM在首次被attach时会创建.java_pid<pid>用于socket通信，
 文件/tmp目录下（不同操作系统tmp目录位置不同，Linux 系统为/tmp 目录），该目录不可以被参数修改。
 在Attach listener初始化过程中，这个文件首次被创建后，JVM会标记Attach Listener为initialized状态，
 如果文件被删除了，这个Java进程无法被Attach。
 
-#### 方案
++ 方案
 
 + 对于JDK8来说，只能重启进程；
 + 社区的讨论以及官方修复；
@@ -1554,9 +1309,9 @@ if (cur_state == AL_INITIALIZING) {
 ```
 需要说明的是，该修复仅限JDK11高版本。
 
-### attach进程的权限问题
+#### attach进程的权限问题
 
-#### 现象
++ 现象
 
 如果在root用户下执行jstack，而目标JVM进程不是root权限启动，执行报错如下：
 
@@ -1565,7 +1320,7 @@ Unable to open socket file: target process not responding or HotSpot VM not load
 The -F option can be used when the target process is not responding
 ```
 
-#### 原因
++ 原因
 
 在JDK8上会严格校验发起attach进程的uid、gid，是否与目标JVM 一致。
 
@@ -1673,13 +1428,13 @@ bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
 }
 ```
 
-#### 解决方案
++ 解决方案
 
 切换到与用户相同权限执行然后再执行Attach。 在介绍jattach工具时已经对这部分代码做了详细分析，这里不在赘述。
 
-### com.sun.tools.attach.AttachNotSupportedException: no providers installed
+#### com.sun.tools.attach.AttachNotSupportedException: no providers installed
 
-#### 原因以及解决方案
++ 原因以及解决方案
 是因为引的包有问题，本地装了JDK的话，可以这样引用tools.jar
 ```text
 <dependency>
