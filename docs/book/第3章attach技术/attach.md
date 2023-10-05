@@ -9,8 +9,9 @@ Java Agent有着广泛的使用场景， 如 Java性能诊断工具jstack、jmap
 从JDK1.6开始可以使用Attach API连接到目标JVM上并让目标JVM加载一个Java Agent。
 Attach API的包名称为`com.sun.tools.attach`。如下图3-1所示主要包含2个类：VirtualMachine和VirtualMachineDescriptor。
 
+> 图3-1 Attach API 官方文档
+
 ![图3-1 Attach API 官方文档](images/图3-1 Attach API 官方文档.png)
-图3-1 Attach API 官方文档
 
 VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，而VirtualMachineDescriptor用来描述虚拟机信息，配合VirtualMachine类完成各种功能。
 
@@ -40,7 +41,7 @@ public class Main {
     }
 }
 ```
-上面代码输出目标JVM的系统属性参数，其结果如代码清单3-2。
+上面代码输出目标JVM的系统属性参数，其结果如代码清单3-2所示。
 
 > 代码清单3-2
 
@@ -53,7 +54,7 @@ java.vm.vendor=Oracle Corporation
 // ... 其他参数省略
 ```
 
-在代码清单3-1第9行处，可以直观的理解在调用attach方法之后，就获得了一个目标JVM的VirtualMachine对象，调用VirtualMachine对象的方法（如代码第 12 行处，调用getSystemProperties方法）就可以完成对目标JVM的操作。除了获取目标 JVM 系统参数的方法之外，VirtualMachine还有如下方法，如代码清单3-3所示。
+在代码清单3-1第9行处，可以直观的理解在调用attach方法之后，就获得了一个目标JVM的VirtualMachine对象，调用VirtualMachine对象的方法（代码清单3-1第12行处调用getSystemProperties方法）就可以完成对目标JVM的操作。除了获取目标 JVM 系统参数的方法之外，VirtualMachine还有如下方法，如代码清单3-3所示。
 
 > 代码清单3-3
 
@@ -83,22 +84,23 @@ public abstract String startLocalManagementAgent() throws IOException;
 
 ### 3.2.1 Attach客户端源码解析
 
-有了前面一节的使用API使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`com.sun.tools.attach.VirtualMachine`是抽象类，不同厂商的虚拟机可以实现不同VirtualMachine子类，HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，它也是一个抽象类，在不同操作系统上都有各自实现，如Linux系统上的实现为VirtualMachineImpl为VirtualMachineImpl。VirtualMachineImpl类的的继承关系如下图3-2所示：
-![截屏2023-10-04 下午7.13.30.png](images%2F%E6%88%AA%E5%B1%8F2023-10-04%20%E4%B8%8B%E5%8D%887.13.30.png)
+有了前面一节的使用API使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`VirtualMachine`是抽象类，不同厂商的虚拟机可以实现不同VirtualMachine子类，HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，它也是一个抽象类，在不同操作系统上 还有各自实现，如Linux系统上的实现为VirtualMachineImpl。VirtualMachineImpl类的的继承关系如下图3-2所示：
+
+> 图3-2 VirtualMachineImpl类的继承关系
+
 ![图3-2 VirtualMachineImpl继承关系.png](images%2F%E5%9B%BE3-2%20VirtualMachineImpl%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png)
-图3-2 VirtualMachineImpl类的继承关系
 
 先来看下`HotSpotVirtualMachine`抽象类的loadAgentLibrary方法
 ```java
-
+// 代码位置：src/jdk.attach/share/classes/sun/tools/attach/HotSpotVirtualMachine.java
 private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options)
     throws AgentLoadException, AgentInitializationException, IOException
 {
     if (agentLibrary == null) {
         throw new NullPointerException("agentLibrary cannot be null");
     }
-    // jdk8及以下返回0
-    // jdk9及以上返回字符串"return code: 0"
+    
+    // jdk11返回字符串"return code: 0"
     String msgPrefix = "return code: ";
     // 执行load指令，给目标 jvm 传输 agent jar路径和参数
     InputStream in = execute("load",
@@ -124,10 +126,7 @@ private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String op
 
 上面的代码是加载一个Java Agent，核心实现在 `execute` 方法中，来看下execute方法的源码：
 ```java
-/*
- * Execute the given command in the target VM - specific platform
- * implementation must implement this.
- */
+// 在目标JVM上执行给定的命令，需要由子类来实现
 abstract InputStream execute(String cmd, Object ... args)
     throws AgentLoadException, IOException;
 ```
@@ -141,7 +140,6 @@ VirtualMachineImpl(AttachProvider provider, String vmid)
 {
     super(provider, vmid);
 
-    // This provider only understands pids
     int pid;
     try {
         pid = Integer.parseInt(vmid);
@@ -149,9 +147,6 @@ VirtualMachineImpl(AttachProvider provider, String vmid)
         throw new AttachNotSupportedException("Invalid process identifier");
     }
     // 在/tmp目录下寻找socket文件是否存在                    
-    // Find the socket file. If not found then we attempt to start the
-    // attach mechanism in the target VM by sending it a QUIT signal.
-    // Then we attempt to find the socket file again.
     File socket_file = new File(tmpdir, ".java_pid" + pid);
     socket_path = socket_file.getPath();
     if (!socket_file.exists()) {
@@ -161,14 +156,13 @@ VirtualMachineImpl(AttachProvider provider, String vmid)
             // 向目标JVM 发送 kill -3 信号
             sendQuitTo(pid);
 
-            // 等待目标 jvm 创建 socket 文件
-            // give the target VM time to start the attach mechanism
+            // 等待目标JVM创建socket文件
             final int delay_step = 100;
             final long timeout = attachTimeout();
             long time_spend = 0;
             long delay = 0;
             do {
-                // Increase timeout on each attempt to reduce polling
+                // 计算等待时间
                 delay += delay_step;
                 try {
                     Thread.sleep(delay);
@@ -176,7 +170,6 @@ VirtualMachineImpl(AttachProvider provider, String vmid)
 
                 time_spend += delay;
                 if (time_spend > timeout/2 && !socket_file.exists()) {
-                    // Send QUIT again to give target VM the last chance to react
                     sendQuitTo(pid); // 发送kill -3 信号
                 }
             } while (time_spend <= timeout && !socket_file.exists());
@@ -195,14 +188,9 @@ VirtualMachineImpl(AttachProvider provider, String vmid)
         }
     }
 
-    // Check that the file owner/permission to avoid attaching to
-    // bogus process
     // 确认socket文件权限
     checkPermissions(socket_path);
 
-    // Check that we can connect to the process
-    // - this ensures we throw the permission denied error now rather than
-    // later when we attempt to enqueue a command.
     // 尝试连接socket，确认可以连接到目标JVM
     int s = socket();
     try {
@@ -214,15 +202,15 @@ VirtualMachineImpl(AttachProvider provider, String vmid)
 ```
 再次梳理下attach通信的过程：
 
-第一步： 发起attach的进程在/tmp目录下查找目标JVM是否已经创建了`.java_pid<pid>` ，如果已经创建，直接跳到第六步；
+第一步： 发起attach的进程在/tmp目录下查找目标JVM是否已经创建了.java_pid<pid> ，如果已经创建，直接跳到第六步；
 
-第二步： attach进程创建socket通信的握手文件`.attach_pid<pid>`；
+第二步： attach进程创建socket通信的握手文件.attach_pid<pid>；
 
 第三步： attach进程给目标JVM发送SIGQUIT（kill -3）信号，提示目标JVM外部进程发起了attach请求；
 
-第四步： attach进程等待.java_pid<pid>文件创建，.java_pid<pid>文件由目标JVM创建；
+第四步： attach进程循环等待目标JVM创建.java_pid<pid>文件；
 
-第五步： 删除`握手文件`attach_pid文件；
+第五步： 删除握手文件.attach_pid<pid>文件；
 
 第六步： attach进程校验socket文件权限；
 
@@ -230,6 +218,7 @@ VirtualMachineImpl(AttachProvider provider, String vmid)
 
 上面详细说明了socket连接的建立过程，下面将介绍发送命令的协议。
 ```java
+// 代码位置：src/jdk.attach/linux/classes/sun/tools/attach/VirtualMachineImpl.java
 InputStream execute(String cmd, Object ... args) throws AgentLoadException, IOException {
     // 参数、socket_path校验
         
@@ -245,8 +234,7 @@ InputStream execute(String cmd, Object ... args) throws AgentLoadException, IOEx
 
     IOException ioe = null;
 
-    // connected - write request
-    // <ver> <cmd> <args...>
+    // 发送attach请求信息
     try {
         // 发送协议
         writeString(s, PROTOCOL_VERSION);
@@ -266,10 +254,9 @@ InputStream execute(String cmd, Object ... args) throws AgentLoadException, IOEx
     }
 
     // 读取执行结果
-    // Create an input stream to read reply
     SocketInputStream sis = new SocketInputStream(s);
 
-    // Read the command completion status
+    // 读取命令的执行状态
     int completionStatus;
     try {
         completionStatus = readInt(sis);
@@ -303,9 +290,9 @@ strace -f java Main 2> main.out
 [pid 31412] write(6, "\0", 1)           = 1   // 分割符号
 [pid 31412] write(6, "properties", 10)  = 10  // 命令
 [pid 31412] write(6, "\0", 1)           = 1   // 分割符号
-[pid 31412] write(6, "\0", 1 <unfinished ...> 
-[pid 31412] write(6, "\0", 1)           = 1
-[pid 31412] write(6, "\0", 1)           = 1
+[pid 31412] write(6, "\0", 1 <unfinished ...> // 参数1
+[pid 31412] write(6, "\0", 1)           = 1   // 参数2
+[pid 31412] write(6, "\0", 1)           = 1   // 参数3
 // 读取返回结果
 [pid 31412] read(6, "0", 1)             = 1
 [pid 31412] read(6, "\n", 1)            = 1
@@ -331,13 +318,14 @@ n byte arg3
 ```
 ### 3.2.2 Attach服务端源码解析
 
-我们再来看下接收attach命令的服务端是如何实现的，这部分代码是c/c++语言，但是也是不难理解的。
+我们再来看下接收Attach命令的服务端是如何实现的，这部分代码是c/c++语言，但是也是不难理解的。
 以Linux系统为例子，说明目标JVM如何处理Attach请求和执行指定的命令。
 
 Linux系统下Attach机制信号与线程的创建流程可以描述为下图3-2。
-![图3-2 Attach机制信号与线程的处理流程](images/图3-2 Attach机制信号与线程的处理流程.png)
-图3-2 Attach机制信号与线程的处理流程
 
+> 图3-3 Attach机制信号与线程的处理流程
+
+![图3-3 Attach机制信号与线程的处理流程](images/图3-3 Attach机制信号与线程的处理流程.png)
 
 先来看下目标JVM如何处理`kill -3`信号。JVM初始化过程中会创建2个线程，线程名称分别为`Signal Dispatcher`和`Attach Listener`，Signal Dispatcher线程用来处理信号量，Attach Listener线程用来响应Attach请求。
 
@@ -636,16 +624,6 @@ int LinuxAttachListener::init() {
 ```
 AttachListener::pd_init()方法调用了LinuxAttachListener::init()方法，完成了套接字的创建和监听。
 
-
-
-##### AttachListener::set_initialized
-
-
-
-TODO
-
-
-
 ##### LinuxAttachListener::dequeue
 
 for循环的执行逻辑，流程简略的概括为下面的步骤：
@@ -745,8 +723,8 @@ LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
 
  Attach 机制详细的交互流程可以用下面的图3-3描述。
 
-![图3-3 Attach交互处理流程](images/图3-3 Attach交互处理流程.png)
-图3-3 Attach交互处理流程
+![图3-4 Attach交互处理流程](images/图3-4 Attach交互处理流程.png)
+图3-4 Attach交互处理流程
 
 ### 3.2.3 Attach机制涉及到的JVM参数
 
@@ -1091,7 +1069,7 @@ jattach是一个不依赖于jdk/jre的运行时注入工具，并且具备jmap�
 
 ```src/posix/jattach.c
 int jattach(int pid, int argc, char** argv) {
-    // 获取attach进程和目标JVM进程的用户权限id
+    // 获取attach进程和目标JVM进程的用户权限
     uid_t my_uid = geteuid();
     gid_t my_gid = getegid();
     uid_t target_uid = my_uid;
@@ -1136,7 +1114,7 @@ jattach给我们编译了各种平台的可执行文件，对于构建跨平台�
 
 ## 3.4.attach 的常见坑
 
-#### 1.不同版本JDK在Attach成功后返回结果差异性
+#### 不同版本JDK在Attach成功后返回结果差异性
 
 + 现象
 
@@ -1144,25 +1122,18 @@ jattach给我们编译了各种平台的可执行文件，对于构建跨平台�
 但实际上已经attach成功了。异常结果如下：
 
 ```text
-[WARN] Current VM java version: 11 do not match target VM java version: 1.8, attach may fail.
-[WARN] Target VM JAVA_HOME is /Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home, arthas-boot JAVA_HOME is /Users/hengyunabc/.sdkman/candidates/java/11.0.11-zulu/zulu-11.jdk/Contents/Home, try to set the same JAVA_HOME.
-[ERROR] Start arthas failed, exception stack trace:
-com.sun.tools.attach.AgentLoadException: 0
+Start arthas failed, exception stack trace: com.sun.tools.attach.AgentLoadException: 0
  at jdk.attach/sun.tools.attach.HotSpotVirtualMachine.loadAgentLibrary(HotSpotVirtualMachine.java:108)
  at jdk.attach/sun.tools.attach.HotSpotVirtualMachine.loadAgentLibrary(HotSpotVirtualMachine.java:119)
  at jdk.attach/sun.tools.attach.HotSpotVirtualMachine.loadAgent(HotSpotVirtualMachine.java:147)
- at com.taobao.arthas.core.Arthas.attachAgent(Arthas.java:122)
- at com.taobao.arthas.core.Arthas.<init>(Arthas.java:27)
- at com.taobao.arthas.core.Arthas.main(Arthas.java:151)
-
 ```
 
 + 原因
 
-在不同的JDK中HotSpotVirtualMachine#loadAgentLibrary的返回值不一样 ，
-在JDK8中返回0表示attach成功。
+在不同的JDK中HotSpotVirtualMachine#loadAgentLibrary方法的返回值不一样 ，在JDK8中返回0表示attach成功。
 
 ```java
+// 代码位置：src/share/classes/sun/tools/attach/HotSpotVirtualMachine.java
 private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options)
     throws AgentLoadException, AgentInitializationException, IOException
 {
@@ -1186,6 +1157,7 @@ private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String op
 JDK11返回的是"return code: 0"表示attach成功。
 
 ```java
+// 代码位置：src/jdk.attach/share/classes/sun/tools/attach/HotSpotVirtualMachine.java
 private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options) 
     throws AgentLoadException, AgentInitializationException, IOException 
 {   
@@ -1200,8 +1172,8 @@ private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String op
         if (result == null) { 
             throw new AgentLoadException("Target VM did not respond"); 
         } else if (result.startsWith(msgPrefix)) { 
-            // "return code: 0" 表示attach成功 
             int retCode = Integer.parseInt(result.substring(msgPrefix.length())); 
+            // "return code: 0" 表示attach成功 
             if (retCode != 0) { 
                 throw new AgentInitializationException("Agent_OnAttach failed", retCode); 
             } 
@@ -1216,7 +1188,8 @@ private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String op
 
 发起Attach的进程需要兼容不同版本JDK返回结果。下面是arthas诊断工具对这个问题的兼容性处理方案：
 
-```arthas/core/src/main/java/com/taobao/arthas/core/Arthas.java#L122
+```java
+// 代码位置：arthas/core/src/main/java/com/taobao/arthas/core/Arthas.java
 try {
     virtualMachine.loadAgent(arthasAgentPath,
             configure.getArthasCore() + ";" + configure.toString());
@@ -1244,14 +1217,14 @@ try {
 }
 ```
 上面的代码可以看出，在Attach抛出异常后，对异常进行分类处理，当抛出IOException并且异常的message中有"Non-numeric value found"，表示该异常是由于低版本Attach API attach 到高版本JDK上；
-当抛出的异常是AgentLoadException并且message的值为"0"时，表示该异常是由于高版本Attach API attach 到低版本JDK导致。对于其他异常，抛出即可。
+当抛出的异常是AgentLoadException并且message的值为"0"时，表示该异常是由于高版本Attach API attach 到低版本JDK导致。
 
 
 #### .java_pid<pid>文件被删除
 
 + 现象
 
-当执行attach命令如jstack时，出现报错Unable to open socket file: target process not responding or HotSpot VM not loaded
+当执行attach命令如jstack时，出现报错Unable to open socket file: target process not responding or HotSpot VM not loaded。错误如下所示：
 
 ```text
 MacBook-Pro admin$ jstack 33000
@@ -1277,8 +1250,8 @@ ls: .java_pid3000: No such file or directory
 
 + 方案
 
-+ 对于JDK8来说，只能重启进程；
-+ 社区的讨论以及官方修复；
+  对于JDK8来说，只能重启进程；社区的讨论以及官方修复；
+
 
 官方修复的pr给Attach Listener增加了INITIALIZING、NOT_INITIALIZED、INITIALIZED多种状态，并且在INITIALIZED状态下通过AttachListener::check_socket_file进行自检，如果发现文件不存在，会清理之前的listener，并重新建立。
 
@@ -1322,16 +1295,10 @@ The -F option can be used when the target process is not responding
 
 + 原因
 
-在JDK8上会严格校验发起attach进程的uid、gid，是否与目标JVM 一致。
-
-下面是LinuxAttachListener线程接受命令的过程（代码位置：hotspot/src/os/linux/vm/attachListener_linux.cpp）
+下面是在JDK8上LinuxAttachListener线程接受命令的过程。在代码26行处会严格校验发起attach进程的uid和gid是否与目标JVM 一致。
 
 ```c++
-// Dequeue an operation
-//
-// In the Linux implementation there is only a single operation and clients
-// cannot queue commands (except at the socket level).
-//
+// 代码位置：jdk8/src/hotspot/os/linux/vm/attachListener_linux.cpp
 LinuxAttachOperation* LinuxAttachListener::dequeue() {
   for (;;) {
     int s;
@@ -1376,11 +1343,7 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
 原则是上root权限不应该受到限制，因此JDK11对这个"不太合理"的限制做了解除，可以使用root权限attach任意用户启动的Java进程。
 
 ```c++
-// Dequeue an operation
-//
-// In the Linux implementation there is only a single operation and clients
-// cannot queue commands (except at the socket level).
-//
+// 代码位置：jdk11/src/hotspot/os/linux/attachListener_linux.cpp
 LinuxAttachOperation* LinuxAttachListener::dequeue() {
   for (;;) {
     int s;
@@ -1401,7 +1364,7 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
       ::close(s);
       continue;
     }
-    // matches_effective_uid_and_gid_or_root 允许root权限attach
+    // 允许root权限attach
     if (!os::Posix::matches_effective_uid_and_gid_or_root(cred_info.uid, cred_info.gid)) {
       log_debug(attach)("euid/egid check failed (%d/%d vs %d/%d)",
               cred_info.uid, cred_info.gid, geteuid(), getegid());
@@ -1421,7 +1384,7 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
 }
 ```
 
-matches_effective_uid_and_gid_or_root 的实现如下：
+matches_effective_uid_and_gid_or_root 的实现如下： 
 ```json
 bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
     return is_root(uid) || (geteuid() == uid && getegid() == gid);
@@ -1435,7 +1398,7 @@ bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
 #### com.sun.tools.attach.AttachNotSupportedException: no providers installed
 
 + 原因以及解决方案
-是因为引的包有问题，本地装了JDK的话，可以这样引用tools.jar
+是因为引用的tools.jar包有问题，应该这样引用tools.jar
 ```text
 <dependency>
 	<groupId>com.sun</groupId>
