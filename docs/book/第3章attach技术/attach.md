@@ -1013,7 +1013,7 @@ int jattach(int pid, int argc, char** argv) {
 需要注意的是，在发起attach之前，需要将attach进程的权限设置为与目标JVM权限一致。
 jattach给我们编译了各种平台的可执行文件，对于构建跨平台运行时注入工具很有用。我们仅需要使用即可，无需关心里面的实现。
 
-## 3.4.Attach常见的坑
+## 3.4 Attach常见的坑
 
 #### 不同版本JDK在Attach成功后返回结果差异性
 
