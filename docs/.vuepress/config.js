@@ -184,7 +184,7 @@ module.exports = {
                     '/guide/': getGuideSidebar('概述', '安装', '深入', 'HOOK', '案例', 'FAQ','故障'),
                     '/case/': getCaseSidebar('命令执行', '表达式注入', '反序列化', 'SQL注入', '文件访问', '外部实体注入'),
                     '/algorithm/': getAlgorithmSidebar('命令执行', 'SQL注入', 'XXE', '线程注入'),
-                    '/boke/': getBokeSidebar('RASP核心技术','性能')
+                    '/boke/': getBokeSidebar('第3章Attach技术','性能')
                 }
             }
         }
@@ -350,8 +350,11 @@ function getBokeSidebar(groupA,groupB) {
             title: groupA,
             collapsable: false,
             children: [
-                'hook/agent/agent',
-                'hook/http'
+                'attach/1',
+                'attach/2',
+                'attach/3',
+                'attach/4',
+                'attach/5',
             ]
         },
         {
