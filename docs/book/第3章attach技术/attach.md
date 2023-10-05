@@ -15,7 +15,7 @@ Attach API的包名称为`com.sun.tools.attach`。如下图3-1所示主要包含
 
 VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，而VirtualMachineDescriptor用来描述虚拟机信息，配合VirtualMachine类完成各种功能。
 
-主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面将重点介绍VirtualMachine类的使用。下面的代码使用Attach API连接到进程pid为72695的JVM进程上，然后读取目标JVM的系统参数并输出到终端，最后调用detach与目标JVM断开连接。
+主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面的代码使用Attach API连接到进程pid为72695的JVM进程上，然后读取目标JVM的系统参数并输出到终端，最后调用detach与目标JVM断开连接。
 
 ```java
 import java.util.Properties;
@@ -556,7 +556,7 @@ static void attach_listener_thread_entry(JavaThread* thread, TRAPS) {
 
 第三步：从队列中取AttachOperation，并且调用对应的处理函数处理并返回结果。
 
-下面分别对这个三个过程详细分析。
+下面分别对这个过程详细分析。
 
 ##### AttachListener::pd_init
 
@@ -771,20 +771,11 @@ JVM 参数都在`src/hotspot/share/runtime/globals.hpp` 中定义
 
 #### 3.3.1.1 建立通信
 
++ 执行attach
+
 > 代码位置：attach/attach_linux.go
 
 ```go
-package attach
-
-import (
-	"fmt"
-	"net"
-	"os"
-	"path/filepath"
-	"syscall"
-	"time"
-)
-
 // 执行attach
 func force_attach(pid int) error {
   // 进程的工作目录下创建.attach_pid<pid>文件
@@ -824,7 +815,22 @@ func GetSocketFile(pid int) (string, error) {
 	return sockfile, nil
 }
 
-// 创建UDS
+func exists(name string) bool {
+	if _, err := os.Stat(name); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
+}
+```
+
++ 连接到目标JVM的UDS上
+
+> 代码位置：attach/attach_linux.go
+
+```go
+// 连接UDS
 func New(pid int) (*Socket, error) {
 	sockfile, err := GetSocketFile(pid)
 	if err != nil {
@@ -842,31 +848,15 @@ func New(pid int) (*Socket, error) {
 	}
 	return &Socket{c}, nil
 }
-
-func exists(name string) bool {
-	if _, err := os.Stat(name); err != nil {
-		if os.IsNotExist(err) {
-			return false
-		}
-	}
-	return true
-}
 ```
 
-上面的`force_attach`方法创建attach_pid 文件并向目标JVM发送kill -3信号；
+`force_attach`方法创建attach_pid 文件并向目标JVM发送kill -3信号，然后连接到目标JVM创建的UDS上。
 
 #### 3.3.1.2 发送命令和参数
 
+> 代码位置：attach/attach.go
+
 ```go
-package attach
-
-import (
-	"fmt"
-	"io"
-	"net"
-	"strconv"
-)
-
 const PROTOCOL_VERSION = "1"
 const ATTACH_ERROR_BADVERSION = 101
 
@@ -874,62 +864,19 @@ type Socket struct {
 	sock *net.UnixConn
 }
 
-func (sock *Socket) Close() error {
-	return sock.sock.Close()
-}
-
-// read
-func (sock *Socket) Read(b []byte) (int, error) {
-	return sock.sock.Read(b)
-}
-
-// read
-func (sock *Socket) ReadString() (string, error) {
-	retval := ""
-	for {
-		buf := make([]byte, 1024)
-		read, err := sock.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return retval, err
-		}
-		retval += string(buf[0 : read-1])
-	}
-	return retval, nil
-}
-
-// jstack
-func (sock *Socket) RemoteDataDump() (string, error) {
-	err := sock.Execute("threaddump")
-	if err != nil {
-		return "", err
-	}
-
-	return sock.ReadString()
-}
-
-// jcmd
-func (sock *Socket) Jcmd(args ...string) (string, error) {
-	err := sock.Execute("jcmd", args...)
-	if err != nil {
-		return "", err
-	}
-
-	return sock.ReadString()
-}
-
-// write
+// 执行命令
 func (sock *Socket) Execute(cmd string, args ...string) error {
-	err := sock.writeString(PROTOCOL_VERSION)
+	// 写入协议版本
+  err := sock.writeString(PROTOCOL_VERSION)
 	if err != nil {
 		return err
 	}
+  // 写入命令字符串
 	err = sock.writeString(cmd)
 	if err != nil {
 		return err
 	}
+  // 写入参数
 	for i := 0; i < 3; i++ {
 		if len(args) > i {
 			err = sock.writeString(args[i])
@@ -943,7 +890,7 @@ func (sock *Socket) Execute(cmd string, args ...string) error {
 			}
 		}
 	}
-
+	// 读取执行结果
 	i, err := sock.readInt()
 	if i != 0 {
 		if i == ATTACH_ERROR_BADVERSION {
@@ -954,69 +901,12 @@ func (sock *Socket) Execute(cmd string, args ...string) error {
 	}
 	return err
 }
-
-func (sock *Socket) readInt() (int, error) {
-	b := make([]byte, 1)
-	buf := make([]byte, 0)
-	for {
-		_, err := sock.Read(b)
-		if err != nil {
-			return 0, err
-		}
-		if '0' <= b[0] && b[0] <= '9' {
-			buf = append(buf, b[0])
-			continue
-		}
-
-		if len(buf) == 0 {
-			return 0, fmt.Errorf("cannot read int")
-		} else {
-			return strconv.Atoi(string(buf))
-		}
-	}
-}
-
-func (sock *Socket) writeString(s string) error {
-	return sock.write([]byte(s))
-}
-
-func (sock *Socket) write(bytes []byte) error {
-	{
-		wrote, err := sock.sock.Write(bytes)
-		if err != nil {
-			return err
-		}
-		if wrote != len(bytes) {
-			return fmt.Errorf("cannot write")
-		}
-	}
-	{
-		wrote, err := sock.sock.Write([]byte("\x00"))
-		if err != nil {
-			return err
-		}
-		if wrote != 1 {
-			return fmt.Errorf("cannot write null byte")
-		}
-	}
-	return nil
-}
 ```
-上面代码主要功能是`Execute`方法, 该方法向socket写入上指定的字符序列。
+上面代码主要功能是`Execute`方法, 该方法向socket写入指定的字符序列。
 
 #### 3.3.1.3 获取目标JVM的堆栈信息
-再来看下main方法，接受pid参数并dump目标jvm的堆栈信息
+再来看下main方法，接受pid参数并dump目标jvm的堆栈信息。
 ```go
-package main
-
-import (
-	"attach/attach"
-	"fmt"
-	"log"
-	"os"
-	"strconv"
-)
-
 // threaddump
 func main() {
 
@@ -1072,21 +962,7 @@ _java_thread_list=0x00007fc8a5f83fe0, length=11, elements={
 ### 3.3.2 jattach
 
 #### 3.3.2.1 简介
-jattach是一个不依赖于jdk/jre的运行时注入工具，并且具备jmap、jstack、jcmd和jinfo等功能，
-同时支持linux、windows、macos等操作系统。项目地址：https://github.com/jattach/jattach
-
-支持的命令包括：
-
-+ load：加载agent
-+ properties： 获取系统参数
-+ agentProperties： 获取agent系统参数
-+ datadump： 堆和线程的状态信息
-+ threaddump：dump堆栈
-+ dumpheap：dump内存的使用状态
-+ inspectheap：fullgc 之后 dump 堆内存
-+ setflag：修改可变VM参数
-+ printflag：输出JVM系统参数
-+ jcmd： 执行jcmd命令
+jattach是一个不依赖于jdk/jre的运行时注入工具，并且具备jmap、jstack、jcmd和jinfo等功能，同时支持linux、windows和macos等操作系统。项目地址：https://github.com/jattach/jattach
 
 #### 3.3.2.2 源码解析
 
