@@ -1,6 +1,6 @@
-# Attach机制
+# 第3章 Attach机制
 
-Attach机制从JDK1.6开始引入， 主要是给运行中的Java进程注入一个Java Agent。
+Attach机制从JDK1.6开始引入，主要是给运行中的Java进程注入一个Java Agent。
 Java Agent有着广泛的使用场景， 如 Java性能诊断工具jstack、jmap 和Arthas等都使用了该技术。
 
 本章将从Attach API的基本使用、实现原理、开源工具和常见的坑等几个方面介绍Attach技术。
@@ -16,8 +16,6 @@ Attach API的包名称为`com.sun.tools.attach`。如下图3-1所示主要包含
 VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，而VirtualMachineDescriptor用来描述虚拟机信息，配合VirtualMachine类完成各种功能。
 
 主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面将重点介绍VirtualMachine类的使用。下面的代码使用Attach API连接到进程pid为72695的JVM进程上，然后读取目标JVM的系统参数并输出到终端，最后调用detach与目标JVM断开连接。
-
-> 代码清单3-1
 
 ```java
 import java.util.Properties;
@@ -41,9 +39,7 @@ public class Main {
     }
 }
 ```
-上面代码输出目标JVM的系统属性参数，其结果如代码清单3-2所示。
-
-> 代码清单3-2
+上面代码输出目标JVM的系统属性参数，其结果如下所示。
 
 ```
 java.runtime.name=Java(TM) SE Runtime Environment
@@ -54,9 +50,7 @@ java.vm.vendor=Oracle Corporation
 // ... 其他参数省略
 ```
 
-在代码清单3-1第9行处，可以直观的理解在调用attach方法之后，就获得了一个目标JVM的VirtualMachine对象，调用VirtualMachine对象的方法（代码清单3-1第12行处调用getSystemProperties方法）就可以完成对目标JVM的操作。除了获取目标 JVM 系统参数的方法之外，VirtualMachine还有如下方法，如代码清单3-3所示。
-
-> 代码清单3-3
+上面代码第9行处，可以直观的理解在调用attach方法之后，就获得了一个目标JVM的VirtualMachine对象，调用VirtualMachine对象的方法（第12行处调用getSystemProperties方法）就可以完成对目标JVM的操作。除了获取目标 JVM 系统参数的方法之外，VirtualMachine还有如下方法，如下所示。
 
 ```text
 // 列出当前主机上的所有JVM
@@ -84,15 +78,17 @@ public abstract String startLocalManagementAgent() throws IOException;
 
 ### 3.2.1 Attach客户端源码解析
 
-有了前面一节的使用API使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`VirtualMachine`是抽象类，不同厂商的虚拟机可以实现不同VirtualMachine子类，HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，它也是一个抽象类，在不同操作系统上 还有各自实现，如Linux系统上的实现为VirtualMachineImpl。VirtualMachineImpl类的的继承关系如下图3-2所示：
+有了前面一节的使用API使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`VirtualMachine`是抽象类，不同厂商的虚拟机可以实现不同VirtualMachine子类，HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，它也是一个抽象类，在不同操作系统上还有各自实现，如Linux系统上的JDK11上实现类的名称为VirtualMachineImpl（JDK8上实现类名称为LinuxVirtualMachine）。JDK8上VirtualMachine实现类的的继承关系如下图3-2所示：
 
-> 图3-2 VirtualMachineImpl类的继承关系
+> 图3-2 VirtualMachine实现类的继承关系
 
 ![图3-2 VirtualMachineImpl继承关系.png](images%2F%E5%9B%BE3-2%20VirtualMachineImpl%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png)
 
-先来看下`HotSpotVirtualMachine`抽象类的loadAgentLibrary方法
+先来看下`HotSpotVirtualMachine`类的loadAgentLibrary方法
+
+> 代码位置：src/jdk.attach/share/classes/sun/tools/attach/HotSpotVirtualMachine.java
+
 ```java
-// 代码位置：src/jdk.attach/share/classes/sun/tools/attach/HotSpotVirtualMachine.java
 private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options)
     throws AgentLoadException, AgentInitializationException, IOException
 {
@@ -132,9 +128,11 @@ abstract InputStream execute(String cmd, Object ... args)
 ```
 execute是一个抽象方法，需要在子类中实现，HotSpotVirtualMachine类中的其他方法大多数最终都会调用这个execute方法。
 
-再来看下Linux系统上的实现类`VirtualMachineImpl`代码。
+再来看下Linux系统上的实现类`LinuxVirtualMachine`代码。
+
+> 代码位置：src/jdk.attach/linux/classes/sun/tools/attach/VirtualMachineImpl.java
+
 ``` java    
-// 代码位置：src/jdk.attach/linux/classes/sun/tools/attach/VirtualMachineImpl.java
 VirtualMachineImpl(AttachProvider provider, String vmid)
     throws AttachNotSupportedException, IOException
 {
@@ -217,8 +215,10 @@ VirtualMachineImpl(AttachProvider provider, String vmid)
 第七步： attach进程测试socket连接可用性；
 
 上面详细说明了socket连接的建立过程，下面将介绍发送命令的协议。
+
+> 代码位置：src/jdk.attach/linux/classes/sun/tools/attach/VirtualMachineImpl.java
+
 ```java
-// 代码位置：src/jdk.attach/linux/classes/sun/tools/attach/VirtualMachineImpl.java
 InputStream execute(String cmd, Object ... args) throws AgentLoadException, IOException {
     // 参数、socket_path校验
         
@@ -303,7 +303,7 @@ strace -f java Main 2> main.out
 [pid 31412] read(6, "e=Java Virtual Machine Specifica"..., 128) = 128
 ```
 
-因此Attach客户端的发送协议可以总结为下面的字符串序列，字符串
+因此Attach客户端的发送协议可以总结为下面的字符串序列。
 ```text
 1 byte PROTOCOL_VERSION
 1 byte '\0'
@@ -321,7 +321,7 @@ n byte arg3
 我们再来看下接收Attach命令的服务端是如何实现的，这部分代码是c/c++语言，但是也是不难理解的。
 以Linux系统为例子，说明目标JVM如何处理Attach请求和执行指定的命令。
 
-Linux系统下Attach机制信号与线程的创建流程可以描述为下图3-2。
+Linux系统下Attach机制信号与线程的创建流程可以描述为下图3-3。
 
 > 图3-3 Attach机制信号与线程的处理流程
 
@@ -331,7 +331,9 @@ Linux系统下Attach机制信号与线程的创建流程可以描述为下图3-2
 
 JVM线程的的初始化都在`Threads::create_vm`中，当然与Attach有关的线程也在这个方法中初始化。
 
-```src/hotspot/share/runtime/thread.cpp
+> 代码位置：src/hotspot/share/runtime/thread.cpp
+
+```c++
 // 代码位置 src/hotspot/share/runtime/thread.cpp
 jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
@@ -363,7 +365,9 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
 
 `initialize_jdk_signal_support`的实现代码如下所示：
 
-```src/hotspot/share/runtime/os.cpp
+> 代码位置：src/hotspot/share/runtime/os.cpp
+
+```c++
 // 代码位置 src/hotspot/share/runtime/os.cpp
 // 初始化JDK的信号支持系统
 void os::initialize_jdk_signal_support(TRAPS) {
@@ -387,11 +391,11 @@ void os::initialize_jdk_signal_support(TRAPS) {
 ```
 JVM创建了一个单独的线程来实现信号处理，这个线程名称为Signal Dispatcher。该线程的入口是signal_thread_entry函数。入口函数代码：
 
-代码清单：Signal Dispatcher线程的入口
+>代码清单：Signal Dispatcher线程的入口
+>
+>代码位置 src/hotspot/share/runtime/os.cpp
 
-代码位置 src/hotspot/share/runtime/os.cpp
-
-```src/hotspot/share/runtime/os.cpp
+```c++
 #ifndef SIGBREAK
 #define SIGBREAK SIGQUIT  // SIGBREAK就是SIGQUIT
 #endif
@@ -452,7 +456,10 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
 代码行号1～3定义了宏SIGBREAK，可以看出，SIGBREAK信号就是SIGQUIT。代码26行的DisableAttachMechanism参数可以禁止attach，默认为false，即允许attach。
 
 再来看下`AttachListener::is_init_trigger`的实现。
-```
+
+> 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
+
+```c++
 // 如果在JVM工作目录或者/tmp目录下存在文件.attach_pid<pid>
 // 表示是启动attach机制
 bool AttachListener::is_init_trigger() {
@@ -497,7 +504,7 @@ Attach机制通过Attach Listener线程来进行相关命令的处理，下面�
 >
 >代码位置：src/hotspot/os/linux/attachListener_linux.cpp
 
-```text
+```c++
 void AttachListener::init() {
   
   // 线程名称Attach Listener
@@ -513,7 +520,10 @@ void AttachListener::init() {
 ```
 
 上面的代码初始化了一个线程，并设置线程的入口函数。重点分析下attach_listener_thread_entry函数。
-```text
+
+> 代码位置：src/hotspot/share/services/attachListener.cpp
+
+```c++
 // Attach Listener线程从队列中获取操作命令，并执行命令对应的函数
 static void attach_listener_thread_entry(JavaThread* thread, TRAPS) {
   // STEP1：AttachListener初始化
@@ -549,7 +559,10 @@ static void attach_listener_thread_entry(JavaThread* thread, TRAPS) {
 下面分别对这个三个过程详细分析。
 
 ##### AttachListener::pd_init
-```text
+
+> 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
+
+```c++
 int AttachListener::pd_init() {
   
   // linux 系统下的初始化操作  
@@ -561,6 +574,9 @@ int AttachListener::pd_init() {
 }
 ```
 实际执行的是LinuxAttachListener::init，不同操作系统执行初始化逻辑不同。在Linux系统中实际执行LinuxAttachListener::init。
+
+> 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
+
 ```c++
 // 创建了一个socket并监听socket文件
 int LinuxAttachListener::init() {
@@ -632,8 +648,10 @@ for循环的执行逻辑，流程简略的概括为下面的步骤：
 + 执行匹配到的命令执行函数并返回结果；
 
 AttachOperation的全部操作函数表如下：
-```text
-// 代码位置：src/hotspot/share/services/attachListener.cpp
+
+> 代码位置：src/hotspot/share/services/attachListener.cpp
+
+```c++
 static AttachOperationFunctionInfo funcs[] = {
   { "agentProperties",  get_agent_properties },
   { "datadump",         data_dump },
@@ -649,8 +667,10 @@ static AttachOperationFunctionInfo funcs[] = {
 };
 ```
 对于加载Agent来说，对应的命令就是上面的load。现在，我们知道了Attach Listener大概的工作模式，但是还是不太清楚任务从哪来，这个秘密就藏在AttachListener::dequeue这行代码里面，接下来我们来分析一下dequeue这个函数：
-```text
-// 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
+
+> 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
+
+```c++
 LinuxAttachOperation* LinuxAttachListener::dequeue() {
   for (;;) {
     // 等待attach进程连接socket
@@ -672,8 +692,9 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
 ```
 dequeue方法是一个for循环，会循环使用accept方法，接受socket中传过来的数据，并且在验证通信的另一端的uid与gid与自身的euid与egid相同后，执行read_request方法，从socket读取内容，并且把内容包装成AttachOperation类的一个实例。接下来看看read_request是如何解析socket数据流的。
 
+> 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
+
 ```c++
-// 代码位置：src/hotspot/os/linux/attachListener_linux.cpp
 LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
   // 缓存区最大长度计算，省略...
   
@@ -720,17 +741,18 @@ LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
 
 这是Linux上的实现，不同的操作系统实现方式不一样。Attach Listener线程监听.java_pid<pid>文件，等待Attach 客户端发起连接，解析Attach 客户端的Attach request 请求信息，将请求的字节流包装成一个AttachOperation类型的对象，之后就会从表里查询对应的处理函数，然后进行处理并返回处理结果。
 
+ Attach 机制详细的交互流程可以用下面的图3-4描述。
 
- Attach 机制详细的交互流程可以用下面的图3-3描述。
+> 图3-4 Attach交互处理流程
 
 ![图3-4 Attach交互处理流程](images/图3-4 Attach交互处理流程.png)
-图3-4 Attach交互处理流程
+
 
 ### 3.2.3 Attach机制涉及到的JVM参数
 
 这里重新总结下Attach机制涉及到JVM参数。如下表3-1所示。
 
-表3-1 Attach机制相关的JVM参数
+> 表3-1 Attach机制相关的JVM参数
 
 | 名称 | 含义                       | 默认值   |
 |----|--------------------------|-------|
@@ -749,8 +771,9 @@ JVM 参数都在`src/hotspot/share/runtime/globals.hpp` 中定义
 
 #### 3.3.1.1 建立通信
 
+> 代码位置：attach/attach_linux.go
+
 ```go
-// 代码位置：attach/attach_linux.go
 package attach
 
 import (
@@ -1067,7 +1090,9 @@ jattach是一个不依赖于jdk/jre的运行时注入工具，并且具备jmap�
 
 #### 3.3.2.2 源码解析
 
-```src/posix/jattach.c
+> 代码位置：src/posix/jattach.c
+
+```c
 int jattach(int pid, int argc, char** argv) {
     // 获取attach进程和目标JVM进程的用户权限
     uid_t my_uid = geteuid();
@@ -1132,8 +1157,9 @@ Start arthas failed, exception stack trace: com.sun.tools.attach.AgentLoadExcept
 
 在不同的JDK中HotSpotVirtualMachine#loadAgentLibrary方法的返回值不一样 ，在JDK8中返回0表示attach成功。
 
+> 代码位置：src/share/classes/sun/tools/attach/HotSpotVirtualMachine.java
+
 ```java
-// 代码位置：src/share/classes/sun/tools/attach/HotSpotVirtualMachine.java
 private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String options)
     throws AgentLoadException, AgentInitializationException, IOException
 {
@@ -1188,8 +1214,9 @@ private void loadAgentLibrary(String agentLibrary, boolean isAbsolute, String op
 
 发起Attach的进程需要兼容不同版本JDK返回结果。下面是arthas诊断工具对这个问题的兼容性处理方案：
 
+> 代码位置：arthas/core/src/main/java/com/taobao/arthas/core/Arthas.java
+
 ```java
-// 代码位置：arthas/core/src/main/java/com/taobao/arthas/core/Arthas.java
 try {
     virtualMachine.loadAgent(arthasAgentPath,
             configure.getArthasCore() + ";" + configure.toString());
@@ -1232,7 +1259,7 @@ MacBook-Pro admin$ jstack 33000
 The -F option can be used when the target process is not responding
 ```
 
-并且/tmp目录下没有attach通讯的.java_pid<pid>文件
+并且/tmp目录下没有attach通讯的.java_pid<pid>文件。
 
 ```text
 MacBook-Pro admin$ ls .java_pid3000
@@ -1280,7 +1307,7 @@ if (cur_state == AL_INITIALIZING) {
   continue;
 }
 ```
-需要说明的是，该修复仅限JDK11高版本。
+需要说明的是，该修复仅限JDK11以上版本。
 
 #### attach进程的权限问题
 
@@ -1297,8 +1324,10 @@ The -F option can be used when the target process is not responding
 
 下面是在JDK8上LinuxAttachListener线程接受命令的过程。在代码26行处会严格校验发起attach进程的uid和gid是否与目标JVM 一致。
 
+> 代码位置：jdk8/src/hotspot/os/linux/vm/attachListener_linux.cpp
+
 ```c++
-// 代码位置：jdk8/src/hotspot/os/linux/vm/attachListener_linux.cpp
+
 LinuxAttachOperation* LinuxAttachListener::dequeue() {
   for (;;) {
     int s;
@@ -1342,8 +1371,9 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
 
 原则是上root权限不应该受到限制，因此JDK11对这个"不太合理"的限制做了解除，可以使用root权限attach任意用户启动的Java进程。
 
+> 代码位置：jdk11/src/hotspot/os/linux/attachListener_linux.cpp
+
 ```c++
-// 代码位置：jdk11/src/hotspot/os/linux/attachListener_linux.cpp
 LinuxAttachOperation* LinuxAttachListener::dequeue() {
   for (;;) {
     int s;
@@ -1385,7 +1415,10 @@ LinuxAttachOperation* LinuxAttachListener::dequeue() {
 ```
 
 matches_effective_uid_and_gid_or_root 的实现如下： 
-```json
+
+> 代码位置：jdk11/src/hotspot/os/linux/attachListener_linux.cpp
+
+```c++
 bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
     return is_root(uid) || (geteuid() == uid && getegid() == gid);
 }
@@ -1399,7 +1432,7 @@ bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
 
 + 原因以及解决方案
 是因为引用的tools.jar包有问题，应该这样引用tools.jar
-```text
+```xml
 <dependency>
 	<groupId>com.sun</groupId>
 	<artifactId>tools</artifactId>
@@ -1410,7 +1443,7 @@ bool os::Posix::matches_effective_uid_and_gid_or_root(uid_t uid, gid_t gid) {
 ```
 
 systemPath标签用来指定本地的tools.jar位置，可以把tools.jar的绝对路径配置成相对路径：
-```text
+```xml
 <dependency>
 	<groupId>com.sun</groupId>
 	<artifactId>tools</artifactId>
@@ -1419,3 +1452,4 @@ systemPath标签用来指定本地的tools.jar位置，可以把tools.jar的绝�
 	<systemPath>${env.JAVA_HOME}/lib/tools.jar</systemPath>
 </dependency>
 ```
+
