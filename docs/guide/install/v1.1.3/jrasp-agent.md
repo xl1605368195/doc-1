@@ -54,7 +54,9 @@ cd filebeat
 ```
 使用systemctl自启动 （可选）
 
-修改下面的fileBeatHome的值为实际jrasp安装目录 
+
+修改下面的fileBeatHome的值为fileBeat的解压目录
+> 我这里filebeat解压到了`/usr/local/filebeat`下
 ```shell
 fileBeatHome="/usr/local/filebeat"
 ## systemctl

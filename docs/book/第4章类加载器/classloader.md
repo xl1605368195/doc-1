@@ -396,6 +396,8 @@ JDK9实现模块化之后，对Classloader有所改造，其中一点就是将Ex
 
 ![图4-4 JDK11的类加载器的继承关系](images/图4-4 JDK11的类加载器的继承关系.png)
 
+#### 4.3.2.1 BuiltinClassLoader 
+
 BuiltinClassLoader是PlatformClassLoader、BootClassLoader和AppClassloader的父类，功能上与URLClassLoader相似，都是基于UrlClassPath来实现类的查找，但BuiltinClassLoader还支持从模块中加载类。
 
 BuiltinClassLoader的属性与构造函数如下：
@@ -517,7 +519,7 @@ protected Class<?> findClass(String cn) throws ClassNotFoundException {
     }
 ```
 
-##### 4.3.2.1 BuiltinClassLoader的子类
+##### 4.3.2.2 BuiltinClassLoader的子类以及初始化
 
 ClassLoaders类中分别初始化BootClassLoader、PlatformClassLoader和AppClassLoader类加载器。
 
@@ -540,6 +542,7 @@ public class ClassLoaders {
             new BootClassLoader((append != null && append.length() > 0)
                 ? new URLClassPath(append, true)
                 : null);
+        
         // 初始化PLATFORM_LOADER并指定AppClassLoader的父加载器BOOT_LOADER        
         PLATFORM_LOADER = new PlatformClassLoader(BOOT_LOADER);
 
@@ -564,11 +567,7 @@ public class ClassLoaders {
 
 ```java
 private static class PlatformClassLoader extends BuiltinClassLoader {
-    static {
-        if (!ClassLoader.registerAsParallelCapable())
-            throw new InternalError();
-    }
-
+    
     PlatformClassLoader(BootClassLoader parent) {
         // 类加载器名称为platform
         super("platform", parent, null);
@@ -578,9 +577,8 @@ private static class PlatformClassLoader extends BuiltinClassLoader {
 }
 ```
 
-不同类加载器的分工如下：
-+ BootClassLoader加载的模块，如下所示：
-
+不同类加载器负责加载对应的模块。
++ BOOT_MODULES是由引导加载程序定义的模块：
 > 代码来源：jdk11-1ddf9a99e4ad/make/common/Modules.gmk
 
 ```text
@@ -596,59 +594,35 @@ jdk.management.agent    jdk.net
 jdk.sctp                jdk.unsupported
 jdk.naming.rmi
 ```
-+ PlatformClassLoader加载的模块，如下所示：
++ PLATFORM_MODULES是由平台加载程序定义的模块：
 ```text
-		java.compiler \
-    jdk.aot \
-    jdk.internal.vm.compiler \
-    jdk.internal.vm.compiler.management \
-		java.se
-		
-		
-		java.net.http \
-    java.scripting \
-    java.security.jgss \
-    java.smartcardio \
-    java.sql \
-    java.sql.rowset \
-    java.transaction.xa \
-    java.xml.crypto \
-    jdk.accessibility \
-    jdk.charsets \
-    jdk.crypto.cryptoki \
-    jdk.crypto.ec \
-    jdk.dynalink \
-    jdk.httpserver \
-    jdk.jsobject \
-    jdk.localedata \
-    jdk.naming.dns \
-    jdk.scripting.nashorn \
-    jdk.security.auth \
-    jdk.security.jgss \
-    jdk.xml.dom \
-    jdk.zipfs \
-    
-    jdk.crypto.mscapi
-    jdk.crypto.ucrypto
-```
-其他模块
-```
-jdk.aot                     jdk.jdeps
-jdk.attach                  jdk.jdi
-jdk.compiler                jdk.jdwp.agent
-jdk.editpad                 jdk.jlink
-jdk.hotspot.agent           jdk.jshell
-jdk.internal.ed             jdk.jstatd
-jdk.internal.jvmstat        jdk.pack
-jdk.internal.le             jdk.policytool
-jdk.internal.opt            jdk.rmic
-jdk.jartool                 jdk.scripting.nashorn.shell
-jdk.javadoc                 jdk.xml.bind*
-jdk.jcmd                    jdk.xml.ws*
-jdk.jconsole
+java.net.http           java.scripting  
+java.security.jgss      java.smartcardio    
+java.sql                java.sql.rowset
+java.transaction.xa     java.xml.crypto
+jdk.accessibility       jdk.charsets
+jdk.crypto.cryptoki     jdk.crypto.ec
+jdk.dynalink            jdk.httpserver
+jdk.jsobject            jdk.localedata
+jdk.naming.dns          jdk.scripting.nashorn
+jdk.security.auth       jdk.security.jgss
+jdk.xml.dom             jdk.zipfs
+jdk.crypto.mscapi       jdk.crypto.ucrypto
+java.compiler           jdk.aot
+jdk.internal.vm.compiler
+jdk.internal.vm.compiler.management
+java.se
 ```
 
-## 4.4 web类加载器
++ JRE_TOOL_MODULES是JRE中包含的工具，由AppClassLoader加载;
+```java
+jdk.jdwp.agent
+jdk.pack
+jdk.scripting.nashorn.shell
+```
+未列出的其他模块由AppClassLoader加载。
+
+## 4.4 web容器的加载器
 
 前面介绍了java中类加载的一般模型：双亲委派模型，这个模型适用于大多数类加载的场景，但对于web容器却是不适用的。这是因为servlet规范对web容器的类加载做了一些规定，简单的来说有以下几条：
 
@@ -656,10 +630,10 @@ jdk.jconsole
 + java.lang.Object等系统类不遵循第一条， WEB-INF/classes或WEB-INF/lib中的类不能替换系统类。对于哪些是系统类，其实没有做出具体规定， web容器通常是通过枚举了一些类来进行判断的。
 + web容器的自身的实现类不被应用中的类引用，即web容器的实现类不能被任何应用类加载器加载。对于哪些是web容器的类也是通过枚举包名称来进行判断。
 
-### 4.4.1 Jetty容器的类加载器
+### 4.4.1 Jetty类加载器
 
-为了实现上面的三个要求并实现不同部署应用间依赖的隔离，Jetty定义了自己的类加载器WebAppClassLoader。
-
+为了实现上面的三个要求并实现不同部署应用间依赖的隔离，Jetty定义了自己的类加载器WebAppClassLoader，类加载器的继承关系如下：
+![图4-5 Jetty类加载器的继承关系.png](images%2F%E5%9B%BE4-5%20Jetty%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E7%9A%84%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png)
 WebAppClassLoader的属性如下：
 ```java
 // 类加载器上下文
@@ -736,7 +710,7 @@ public WebAppClassLoader(ClassLoader parent, Context context)
 构造函数可以显示指定父类加载器，默认情况下为空，即将当前的线程上下文classLoader指定为当前的parent，
 而这个线程上下文classLoader如果没有用户指定的话默认又将是前面提到过的System ClassLoader。
 
-再看下loadclass方法：
+再看下loadClass方法：
 ```java
 @Override                                                                                                  
 protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {                 
@@ -761,7 +735,8 @@ protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundE
         try {
             parentClass = _parent.loadClass(name);
             // 判断是否允许加载server类，或者当前类不是 server 类
-            if (Boolean.TRUE.equals(__loadServerClasses.get()) || !_context.isServerClass(parentClass)) {
+            if (Boolean.TRUE.equals(__loadServerClasses.get()) 
+                    || !_context.isServerClass(parentClass)) {
                 return parentClass;
             }
         } catch (ClassNotFoundException e) {
@@ -778,12 +753,242 @@ protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundE
 }                                                                                                          
 ```
 
-### 4.4.2 Tomcat容器的类加载器
 
+### 4.4.2 Tomcat类加载器
+与Jetty容器一样，Tomcat也需要遵循servlet三条规范。Tomcat的类加载器的继承关系如下：
 
+![图4-6 Tomcat类加载器的继承关系.png](images%2F%E5%9B%BE4-6%20Tomcat%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E7%9A%84%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png)
 
+#### WebappClassLoader
+> apache-tomcat-10.1.13-src/java/org/apache/catalina/loader/WebappLoader.java
+```java
+public class WebappClassLoader extends WebappClassLoaderBase {
+    public WebappClassLoader() {
+        super();
+    }
+    public WebappClassLoader(ClassLoader parent) {
+        super(parent);
+    } 
+    
+    //...
+}
+```
 
+WebappClassLoader继承WebappClassLoaderBase，类加载的功能主要在WebappClassLoaderBase中实现。看下代码：
+> 代码来源：apache-tomcat-10.1.13-src/java/org/apache/catalina/loader/WebappClassLoaderBase.java
 
+先来看下构造函数：
+```java
+
+protected boolean delegate = false;
+
+// 加载JavaSE的类加载器
+private ClassLoader javaseClassLoader;
+
+// 当前类加载器的父加载器
+protected final ClassLoader parent;
+
+protected WebappClassLoaderBase() {
+
+    super(new URL[0]);
+    // 初始化没有指定父加载器，则父加载器为系统类加载器
+    ClassLoader p = getParent();
+    if (p == null) {
+        p = getSystemClassLoader();
+    }
+    this.parent = p;
+
+    // 初始化javaseClassLoader为平台类加载器或者扩展类加载器
+    ClassLoader j = String.class.getClassLoader();
+    if (j == null) {
+        j = getSystemClassLoader();
+        while (j.getParent() != null) {
+            j = j.getParent();
+        }
+    }
+    this.javaseClassLoader = j;
+
+    securityManager = System.getSecurityManager();
+    if (securityManager != null) {
+        refreshPolicy();
+    }
+}
+```
+再来看下重写的loadClass方法。
+```java
+
+```
+
+```java
+public abstract class WebappClassLoaderBase extends URLClassLoader
+        implements Lifecycle, InstrumentableClassLoader, WebappProperties, PermissionCheck {
+	// ...	省略不需要关注的代码
+    protected WebappClassLoaderBase() {
+
+        super(new URL[0]);
+		// 获取当前WebappClassLoader的父加载器
+        ClassLoader p = getParent();
+        if (p == null) {
+            p = getSystemClassLoader();
+        }
+        this.parent = p;
+		
+        // 设置javaseClassLoader为平台类加载器或者扩展类加载器
+        ClassLoader j = String.class.getClassLoader();
+        if (j == null) {
+            j = getSystemClassLoader();
+            while (j.getParent() != null) {
+                j = j.getParent();
+            }
+        }
+        this.javaseClassLoader = j;
+
+        // 权限代码省战略...
+    }
+
+    // 省略不需要关注的代码...
+    @Override
+    public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+
+        synchronized (getClassLoadingLock(name)) {
+            
+            Class<?> clazz = null;
+
+			// 本地类缓存中查找
+            clazz = findLoadedClass0(name);
+            if (clazz != null) {
+                return clazz;
+            }
+
+            // Web应用程序本地类缓存中没有，可以从系统类加载器缓存中查找，
+			// 如果找到说明AppClassLoader之前已经加载过这个类
+            clazz = findLoadedClass(name);
+            if (clazz != null) {
+                return clazz;
+            }
+
+			// 将类似java.lang.String这样的类名这样转换成java/lang/String
+            String resourceName = binaryNameToPath(name, false);
+			// 获取引导类加载器（BootstrapClassLoader）
+            ClassLoader javaseLoader = getJavaseClassLoader();
+            boolean tryLoadingFromJavaseLoader;
+            try {
+		        // 引导类加载器根据转换后的类名获取资源url，如果url不为空，就说明找到要加载的类
+                URL url;
+                if (securityManager != null) {
+                    PrivilegedAction<URL> dp = new PrivilegedJavaseGetResource(resourceName);
+                    url = AccessController.doPrivileged(dp);
+                } else {
+                    url = javaseLoader.getResource(resourceName);
+                }
+                tryLoadingFromJavaseLoader = (url != null);
+            } catch (Throwable t) {
+                ExceptionUtils.handleThrowable(t);
+                tryLoadingFromJavaseLoader = true;
+            }
+
+           // 首先，从扩展类加载器（ExtClassLoader）加载
+           if (tryLoadingFromJavaseLoader) {
+               return javaseLoader.loadClass(name);
+            }
+            
+            //   delegate允许类委托给父类加载
+            boolean delegateLoad = delegate || filter(name, true);
+            
+            if (delegateLoad) {
+                return Class.forName(name, false, parent);
+            }
+
+            // 在当前web路径加载
+            return clazz = findClass(name);
+
+            // 经过上面几个步骤还未加载到类，则采用系统类加载器（也称应用程序类加载器）进行加载
+            if (!delegateLoad) {
+               return Class.forName(name, false, parent);
+            }
+        }
+        // 最终，还未加载到类，报类未找到的异常
+        throw new ClassNotFoundException(name);
+    }
+	// ...
+}
+```
+
+#### 4.2.2.2 JSP类加载器（JasperLoader）
+
+```java
+public class JasperLoader extends URLClassLoader {
+
+    private final PermissionCollection permissionCollection;
+    private final SecurityManager securityManager;
+
+    // JSP类加载器的父加载器是Web应用程序类加载器（WebappClassLoader）
+    public JasperLoader(URL[] urls, ClassLoader parent,
+                        PermissionCollection permissionCollection) {
+        super(urls, parent);
+        this.permissionCollection = permissionCollection;
+        this.securityManager = System.getSecurityManager();
+    }
+
+    @Override
+    public Class<?> loadClass(String name) throws ClassNotFoundException {
+        return loadClass(name, false);
+    }
+
+    @Override
+    public synchronized Class<?> loadClass(final String name, boolean resolve)
+        throws ClassNotFoundException {
+
+        Class<?> clazz = null;
+
+        // 从JVM的类缓存中查找
+        clazz = findLoadedClass(name);
+        if (clazz != null) {
+            if (resolve) {
+                resolveClass(clazz);
+            }
+            return clazz;
+        }
+
+        // 当使用SecurityManager安全管理器时，允许访问访类
+        if (securityManager != null) {
+            int dot = name.lastIndexOf('.');
+            if (dot >= 0) {
+                try {
+                    // Do not call the security manager since by default, we grant that package.
+                    if (!"org.apache.jasper.runtime".equalsIgnoreCase(name.substring(0,dot))){
+                        securityManager.checkPackageAccess(name.substring(0,dot));
+                    }
+                } catch (SecurityException se) {
+                    String error = "Security Violation, attempt to use " +
+                        "Restricted Class: " + name;
+                    se.printStackTrace();
+                    throw new ClassNotFoundException(error);
+                }
+            }
+        }
+       // 如果类名不是以org.apache.jsp包名开头的，则采用WebappClassLoader加载
+        if( !name.startsWith(Constants.JSP_PACKAGE_NAME + '.') ) {
+            // Class is not in org.apache.jsp, therefore, have our
+            // parent load it
+            clazz = getParent().loadClass(name);
+            if( resolve ) {
+                resolveClass(clazz);
+            }
+            return clazz;
+        }
+	// 如果是org.apache.jsp包名开头JSP类，就调用父类URLClassLoader的findClass方法
+	// 动态加载类文件，解析成Class类，返回给调用方
+        return findClass(name);
+    }
+}
+
+```
+从源码中我们可以看到，JSP类加载原理是，先从JVM类缓存中（也就是Bootstrap类加载器加载的类）加载，如果不是核心类库的类，就从Web应用程序类加载器WebappClassLoader中加载，如果还未找到，就说明是jsp类，则通过动态解析jsp类文件获得要加载的类。
+
+经过上面两个Tomcat核心类加载器的剖析，我们也就知道了Tomcat类的加载原理了。
+下面我们来总结一下：Tomcat会为每个Web应用程序创建一个WebappClassLoader类加载器进行类的加载，不同的类加载器实例加载的类是会被认为是不同的类，即使它们的类名相同，这样的话就可以实现在同一个JVM下，允许Tomcat容器的不同部分以及在容器上运行的不同Web应用程序可以访问的各种不同版本的类库。
+针对JSP类，会由专门的JSP类加载器（JasperLoader）进行加载，该加载器会针对JSP类在每次加载时都会解析类文件，Tomcat容器会启动一个后台线程，定时检测JSP类文件的变化，及时更新类文件，这样就实现JSP文件的热加载功能。
 
 ## 4.5 热加载与卸载
 
