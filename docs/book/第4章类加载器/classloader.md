@@ -225,7 +225,7 @@ defineClass的实现在defineClass1方法中，defineClass1是一个native方法
 
 > 图4-2 JVM加载类的阶段
 
-![图4-2 JVM加载类的阶段](images/图4-2 JVM加载类的阶段.png)
+![图4-2 JVM加载类的阶段](images/%E5%9B%BE4-2%20JVM%E5%8A%A0%E8%BD%BD%E7%B1%BB%E7%9A%84%E9%98%B6%E6%AE%B5.png)
 
 一般我们只需要重写ClassLoader的findClass方法获取需要加载的类的字节码，然后调用defineClass方法生成Class对象。如果想要在类加载到JVM中时就被链接，可以调用resolveClass方法，也可以选择交给JVM在类初始化时链接。
 
@@ -358,7 +358,7 @@ JDK8的类加载器的继承关系如下图4-3所示：
 
 > 图4-3 JDK8的类加载器的继承关系
 
-![图4-3 JDK8的类加载器的继承关系](images/图4-3 JDK8的类加载器的继承关系.png)
+![图4-3 JDK8的类加载器的继承关系](images/%E5%9B%BE4-3%20JDK8%E7%9A%84%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E7%9A%84%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png)
 
 #### 4.3.1.3 JDK8的类加载器的初始化
 JDK的类加载器的初始化在Launcher类中。
@@ -394,7 +394,7 @@ JDK9实现模块化之后，对Classloader有所改造，其中一点就是将Ex
 
 > 图4-4 JDK11的类加载器的继承关系
 
-![图4-4 JDK11的类加载器的继承关系](images/图4-4 JDK11的类加载器的继承关系.png)
+![图4-4 JDK11的类加载器的继承关系](images/%E5%9B%BE4-4%20JDK11%E7%9A%84%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E7%9A%84%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png)
 
 #### 4.3.2.1 BuiltinClassLoader 
 
