@@ -23,7 +23,7 @@ ClassLoader是一个抽象类，不能直接使用，因此我们需要继承并
  protected final void resolveClass(Class<?> c)
 ```
 
-先来实现一个简单的类加载器NetworkClassLoader，这个类加载器具备从网络加载类文件的能力， 实现代码如下：
+先来实现一个简单的类加载器NetworkClassLoader，这个类加载器具备从网络加载类文件的能力， 实现代码如下。
 ```java
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -49,30 +49,7 @@ public class NetworkClassLoader extends ClassLoader {
     // 从远程下载类文件，从而获得类的字节码数组
     private byte[] loadClassData(String name) {
         // load the class data from the connection
-        InputStream input = null;
-        ByteArrayOutputStream baos = null;
-        String path = classNameToPath(name);
-        try {
-            URL url = new URL(path);
-            byte[] buff = new byte[1024 * 4];
-            int len = -1;
-            input = url.openStream();
-            baos = new ByteArrayOutputStream();
-            while ((len = input.read(buff)) != -1) {
-                baos.write(buff, 0, len);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (input == null) {
-                try {
-                    input.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return baos.toByteArray();
+        // ... 
     }
     
     // 类名称转化为服务器下载的地址
@@ -94,7 +71,7 @@ public class NetworkClassLoader extends ClassLoader {
 }
 ```
 
-被加载的类Foo是一个简单类，在创建实例对象时输出"create new instance"，Foo类的代码如下：
+被加载的类Foo是一个简单类，在创建实例对象时输出"create new instance"，Foo类的代码如下。
 ```java
 public class Foo {
     public Foo() {
@@ -135,7 +112,6 @@ protected Class<?> loadClass(String name, boolean resolve)
             } catch (ClassNotFoundException e) {
                 // 忽略异常，继续查找
             }
-
             if (c == null) {
                 // 父加载器加载不到，调用当前类加载器重写的findClass查找
                 c = findClass(name);
@@ -149,8 +125,8 @@ protected Class<?> loadClass(String name, boolean resolve)
     }
 }
 ```
-
-上面的类加载顺序可以总结为：优先从尝试父加载器去加载（如果父加载器为null，则调用系统类加载器BootstrapClassLoader去加载），父加载器都尝试失败后才会交由当前ClassLoader重写的findClass方法去加载。如下图4-1所示：
+上面的类加载顺序可以总结为：优先从尝试父加载器去加载（如果父加载器为null，则调用系统类加载器BootstrapClassLoader去加载），
+父加载器都尝试失败后才会交由当前ClassLoader重写的findClass方法去加载。如下图4-1所示：
 
 > 图4-1 类加载器的委托模型
 
@@ -168,10 +144,10 @@ protected Class<?> findClass(String name) throws ClassNotFoundException {
     throw new ClassNotFoundException(name);
 }
 ```
-可以看到该方法里面抛出异常，因此不能直接调用，需要子类来实现。URLClassLoader是ClassLoader的子类并重写了findClass方法。
+可以看到该方法里面抛出异常，因此不能直接调用，需要子类来实现。
+URLClassLoader是ClassLoader的子类并重写了findClass方法。
 URLClassLoader的属性与构造器如下：
 > 代码位置：src/java.base/share/classes/java/net/URLClassLoader.java
-
 ```java
 // 类和资源的查找路径
 private final URLClassPath ucp;
@@ -198,14 +174,14 @@ protected Class<?> findClass(final String name) throws ClassNotFoundException {
     return defineClass(name, res);
 }
 ```
-
 URLClassLoader的findClass方法的执行逻辑主要分为三步：
 + 将类的全限定名变成.class文件路径的方式；
 + 在URL中查找文件是否存在；
 + 调用defineClass完成类的链接和初始化；
 
 ### 4.2.3 defineClass
-defineClass与findClass一起使用，findClass负责读取自于磁盘或者网络的字节码，而defineClass将字节码解析为Class对象，在defineClass方法中使用resolveClass方法完成对Class的链接。源代码如下:
+defineClass与findClass一起使用，findClass负责读取自于磁盘或者网络的字节码，而defineClass将字节码解析为Class对象，
+在defineClass方法中使用resolveClass方法完成对Class的链接。源代码如下:
 
 > 代码位置：src/java.base/share/classes/java/lang/ClassLoader.java
 
@@ -268,7 +244,9 @@ null
 ### 4.3.1 JDK8的类加载器
 
 #### 4.3.1.1 AppClassloader
-AppClassloader也称为System ClassLoader，继承了URLClassLoader，是Java虚拟机默认的类加载器之一，主要用来加载用户类和第三方依赖包，在JVM启动命令行中设置-Djava.class.path参数来指定加载路径。
+AppClassloader也称为System ClassLoader，继承了URLClassLoader，
+是Java虚拟机默认的类加载器之一，主要用来加载用户类和第三方依赖包，
+在JVM启动命令行中设置-Djava.class.path参数来指定加载路径。
 > 代码位置：src/share/classes/sun/misc/Launcher$AppClassLoader.java
 ```java
 // AppClassLoader继承URLClassLoader
@@ -371,17 +349,12 @@ public class Launcher {
     public Launcher() {
         // 创建ExtClassLoader
         ClassLoader extcl = ExtClassLoader.getExtClassLoader();
-        
         // 创建AppClassLoader
         ClassLoader loader = AppClassLoader.getAppClassLoader(extcl);
-        
         // 设置当前线程的ContextClassLoader
         Thread.currentThread().setContextClassLoader(loader);
-
         // 异常处理的代码省略
-        
     }
-    
     // ...
 }    
 ```
@@ -624,10 +597,12 @@ jdk.scripting.nashorn.shell
 
 ## 4.4 web容器的加载器
 
-前面介绍了java中类加载的一般模型：双亲委派模型，这个模型适用于大多数类加载的场景，但对于web容器却是不适用的。这是因为servlet规范对web容器的类加载做了一些规定，简单的来说有以下几条：
+前面介绍了Java中类加载的一般模型：双亲委派模型，这个模型适用于大多数类加载的场景，但对于web容器却是不适用的。这是因为servlet规范对web容器的类加载做了一些规定，简单的来说有以下几条：
 
-+ WEB-INF/classes和WEB-INF/lib路径下的类会优先于父容器中的类加载，比如WEB-INF/classes下有个Abc类，CLASSPATH下也有个Abc类，web 容器加载器会优先加载位于WEB-INF/classes下的类，这与双亲委托模型的加载行为相反。
-+ java.lang.Object等系统类不遵循第一条， WEB-INF/classes或WEB-INF/lib中的类不能替换系统类。对于哪些是系统类，其实没有做出具体规定， web容器通常是通过枚举了一些类来进行判断的。
++ WEB-INF/classes和WEB-INF/lib路径下的类会优先于父容器中的类加载。比如WEB-INF/classes下有个Foo类，
+CLASSPATH下也有个Foo类，web容器加载器会优先加载位于WEB-INF/classes下的类，这与双亲委托模型的加载行为相反。
++ java.lang.Object等系统类不遵循第一条。WEB-INF/classes或WEB-INF/lib中的类不能替换系统类。对于哪些是系统类，
+其实没有做出具体规定，web容器通常是通过枚举了一些类来进行判断的。
 + web容器的自身的实现类不被应用中的类引用，即web容器的实现类不能被任何应用类加载器加载。对于哪些是web容器的类也是通过枚举包名称来进行判断。
 
 ### 4.4.1 Jetty类加载器
@@ -648,8 +623,7 @@ private String _name = String.valueOf(hashCode());
 private final List<ClassFileTransformer> _transformers = new CopyOnWriteArrayList<>(); 
 ```
 
-Jetty 中以类的 package 路径名来区分，当类的 package 路径名位包含于以下路径时，会被认为是系统类。系统类是对应用类可见。
-
+当类的package路径名位包含于以下路径时，会被认为是系统类。系统类是对应用类可见。
 ```java
 // 系统类不能被应用jar包中的类替换，并且只能被system classloader加载
 public static final ClassMatcher __dftSystemClasses = new ClassMatcher(
@@ -657,8 +631,7 @@ public static final ClassMatcher __dftSystemClasses = new ClassMatcher(
 );
 ```
 
-Server 类不对任何应用可见，Jetty 同样是用 package 路径名来区分哪些是 Server 类。WebAppContext 中配置如下：
-
+Server类不对任何应用可见，Jetty同样是用package路径名来区分哪些是Server类。WebAppContext中配置如下：
 ```java
 // 使用system classloader加载，并且对web application不可见    
 public static final ClassMatcher __dftServerClasses = new ClassMatcher(
@@ -710,7 +683,7 @@ public WebAppClassLoader(ClassLoader parent, Context context)
 构造函数可以显示指定父类加载器，默认情况下为空，即将当前的线程上下文classLoader指定为当前的parent，
 而这个线程上下文classLoader如果没有用户指定的话默认又将是前面提到过的System ClassLoader。
 
-再看下loadClass方法：
+再看下loadClass方法。
 ```java
 @Override                                                                                                  
 protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {                 
@@ -753,14 +726,13 @@ protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundE
 }                                                                                                          
 ```
 
-
 ### 4.4.2 Tomcat类加载器
 与Jetty容器一样，Tomcat也需要遵循servlet三条规范。Tomcat的类加载器的继承关系如下：
 
 ![图4-6 Tomcat类加载器的继承关系.png](images%2F%E5%9B%BE4-6%20Tomcat%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E7%9A%84%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png)
 
 #### WebappClassLoader
-> apache-tomcat-10.1.13-src/java/org/apache/catalina/loader/WebappLoader.java
+> 代码来源：apache-tomcat-10.1.13-src/java/org/apache/catalina/loader/WebappLoader.java
 ```java
 public class WebappClassLoader extends WebappClassLoaderBase {
     public WebappClassLoader() {
@@ -984,7 +956,7 @@ public class JasperLoader extends URLClassLoader {
 }
 
 ```
-从源码中我们可以看到，JSP类加载原理是，先从JVM类缓存中（也就是Bootstrap类加载器加载的类）加载，如果不是核心类库的类，就从Web应用程序类加载器WebappClassLoader中加载，如果还未找到，就说明是jsp类，则通过动态解析jsp类文件获得要加载的类。
+从源码中我们可以看到，JSP类加载原理是先从JVM类缓存中（也就是Bootstrap类加载器加载的类）加载，如果不是核心类库的类，就从Web应用程序类加载器WebappClassLoader中加载，如果还未找到，就说明是jsp类，则通过动态解析jsp类文件获得要加载的类。
 
 经过上面两个Tomcat核心类加载器的剖析，我们也就知道了Tomcat类的加载原理了。
 下面我们来总结一下：Tomcat会为每个Web应用程序创建一个WebappClassLoader类加载器进行类的加载，不同的类加载器实例加载的类是会被认为是不同的类，即使它们的类名相同，这样的话就可以实现在同一个JVM下，允许Tomcat容器的不同部分以及在容器上运行的不同Web应用程序可以访问的各种不同版本的类库。
@@ -1044,7 +1016,7 @@ public class Main {
     }
 }
 ```
-使用不同的类加载器还在同一个类，得到的class对象不一样。运行时更新 ScriptImpl 类的实现即可ScriptClassLoader的实现如下：
+使用不同的类加载器加载同一个类，得到的class对象不一样。运行时更新ScriptImpl类的实现即可。ScriptClassLoader的实现如下。
 
 ```java
 public class ScriptClassLoader extends ClassLoader {
