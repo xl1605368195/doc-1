@@ -1,7 +1,7 @@
 # 第3章 Attach机制
 
 Attach机制从JDK1.6开始引入，主要是给运行中的Java进程注入一个Java Agent。
-Java Agent有着广泛的使用场景， 如 Java性能诊断工具jstack、jmap 和Arthas等都使用了该技术。
+Java Agent有着广泛的使用场景， 如Java性能诊断工具jstack、jmap 和Arthas等都使用了该技术。
 
 本章将从Attach API的基本使用、实现原理、开源工具和常见的坑等几个方面介绍Attach技术。
 
@@ -11,11 +11,11 @@ Attach API的包名称为`com.sun.tools.attach`。如下图3-1所示主要包含
 
 > 图3-1 Attach API 官方文档
 
-![图3-1 Attach API 官方文档](images/31.png)
+![图3-1 Attach API 官方文档](images/%E5%9B%BE3-1%20Attach%20API%20%E5%AE%98%E6%96%B9%E6%96%87%E6%A1%A3.png)
 
 VirtualMachine代表一个Java虚拟机，也就是监控的目标虚拟机，而VirtualMachineDescriptor用来描述虚拟机信息，配合VirtualMachine类完成各种功能。
 
-主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面的代码使用Attach API连接到进程pid为72695的JVM进程上，然后读取目标JVM的系统参数并输出到终端，最后调用detach与目标JVM断开连接。
+主要的功能实现在`VirtualMachine`以及子类中，其它类起到辅助作用。下面的代码使用Attach API连接到进程pid为72695的JVM进程上，然后读取目标JVM的系统参数并输出到终端，最后调用detach方法与目标JVM断开连接。
 
 ```java
 import java.util.Properties;
@@ -78,7 +78,7 @@ public abstract String startLocalManagementAgent() throws IOException;
 
 ### 3.2.1 Attach客户端源码解析
 
-有了前面一节的使用API使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`VirtualMachine`是抽象类，不同厂商的虚拟机可以实现不同VirtualMachine子类，HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，它也是一个抽象类，在不同操作系统上还有各自实现，如Linux系统上的JDK11上实现类的名称为VirtualMachineImpl（JDK8上实现类名称为LinuxVirtualMachine）。JDK8上VirtualMachine实现类的的继承关系如下图3-2所示：
+有了前面一节的API的使用基础，我们将分析Attach API的实现原理并对相应的源码做解析，从而挖掘更多可用的功能。`VirtualMachine`是抽象类，不同厂商的虚拟机可以实现不同VirtualMachine子类，HotSpotVirtualMachine是HotSpot官方提供的VirtualMachine实现，它也是一个抽象类，在不同操作系统上还有各自实现，如Linux系统上，JDK11版本的实现类的名称为VirtualMachineImpl（JDK8上实现类名称为LinuxVirtualMachine）。JDK8上VirtualMachine实现类的的继承关系如下图3-2所示：
 
 > 图3-2 VirtualMachine实现类的继承关系
 
@@ -325,7 +325,7 @@ Linux系统下Attach机制信号与线程的创建流程可以描述为下图3-3
 
 > 图3-3 Attach机制信号与线程的处理流程
 
-![图3-3 Attach机制信号与线程的处理流程](images/图3-3 Attach机制信号与线程的处理流程.png)
+![图3-3 Attach机制信号与线程的处理流程](images/%E5%9B%BE3-3%20Attach%E6%9C%BA%E5%88%B6%E4%BF%A1%E5%8F%B7%E4%B8%8E%E7%BA%BF%E7%A8%8B%E7%9A%84%E5%A4%84%E7%90%86%E6%B5%81%E7%A8%8B.png)
 
 先来看下目标JVM如何处理`kill -3`信号。JVM初始化过程中会创建2个线程，线程名称分别为`Signal Dispatcher`和`Attach Listener`，Signal Dispatcher线程用来处理信号量，Attach Listener线程用来响应Attach请求。
 
@@ -391,8 +391,6 @@ void os::initialize_jdk_signal_support(TRAPS) {
 ```
 JVM创建了一个单独的线程来实现信号处理，这个线程名称为Signal Dispatcher。该线程的入口是signal_thread_entry函数。入口函数代码：
 
->代码清单：Signal Dispatcher线程的入口
->
 >代码位置 src/hotspot/share/runtime/os.cpp
 
 ```c++
@@ -500,8 +498,6 @@ Attach机制通过Attach Listener线程来进行相关命令的处理，下面�
 
 来看下Attach Listener初始化过程。
 
->代码清单：Attach Listener初始化过程
->
 >代码位置：src/hotspot/os/linux/attachListener_linux.cpp
 
 ```c++
@@ -745,7 +741,7 @@ LinuxAttachOperation* LinuxAttachListener::read_request(int s) {
 
 > 图3-4 Attach交互处理流程
 
-![图3-4 Attach交互处理流程](images/图3-4 Attach交互处理流程.png)
+![图3-4 Attach交互处理流程](images/%E5%9B%BE3-4%20Attach%E4%BA%A4%E4%BA%92%E5%A4%84%E7%90%86%E6%B5%81%E7%A8%8B.png)
 
 
 ### 3.2.3 Attach机制涉及到的JVM参数
@@ -1013,7 +1009,7 @@ int jattach(int pid, int argc, char** argv) {
 需要注意的是，在发起attach之前，需要将attach进程的权限设置为与目标JVM权限一致。
 jattach给我们编译了各种平台的可执行文件，对于构建跨平台运行时注入工具很有用。我们仅需要使用即可，无需关心里面的实现。
 
-## 3.4.attach 的常见坑
+## 3.4 Attach常见的坑
 
 #### 不同版本JDK在Attach成功后返回结果差异性
 
@@ -1328,4 +1324,3 @@ systemPath标签用来指定本地的tools.jar位置，可以把tools.jar的绝�
 	<systemPath>${env.JAVA_HOME}/lib/tools.jar</systemPath>
 </dependency>
 ```
-

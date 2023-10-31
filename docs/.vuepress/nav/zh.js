@@ -3,10 +3,10 @@ module.exports = [
         text: '技术指南',
         link: '/guide/'
     },
-    // {
-    //     text: 'RASP技术内幕',
-    //     link: '/book/'
-    // },
+    {
+        text: 'RASP技术内幕',
+        link: '/book/'
+    },
     {
         text: '漏洞案例',
         link: '/case/'

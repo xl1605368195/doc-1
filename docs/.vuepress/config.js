@@ -181,17 +181,18 @@ module.exports = {
                 lastUpdated: "上次更新",
                 nav: require('./nav/zh'),
                 sidebar: {
-                    '/guide/': getGuideSidebar('概述', '安装', '深入', 'HOOK', '案例', 'FAQ','故障'),
+                    '/guide/': getGuideSidebar('概述', '安装', '深入', 'HOOK', '案例', 'FAQ', '故障'),
                     '/case/': getCaseSidebar('命令执行', '表达式注入', '反序列化', 'SQL注入', '文件访问', '外部实体注入'),
                     '/algorithm/': getAlgorithmSidebar('命令执行', 'SQL注入', 'XXE', '线程注入'),
-                    '/boke/': getBokeSidebar('第3章Attach技术','性能')
+                    '/boke/': getBokeSidebar('第3章Attach技术','性能'),
+                    //'/book/': getBookSidebar('第三章attach技术')
                 }
             }
         }
     }
 };
 
-function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF,groupG) {
+function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF, groupG) {
     return [
         {
             title: groupA,
@@ -345,7 +346,7 @@ function getCaseSidebar(groupA, groupB, groupC, groupD, groupE, groupF) {
     ]
 }
 
-function getBokeSidebar(groupA,groupB) {
+function getBokeSidebar(groupA, groupB) {
     return [
         {
             title: groupA,
@@ -368,15 +369,17 @@ function getBokeSidebar(groupA,groupB) {
     ]
 }
 
-function getDeveloper(groupA) {
+function getBookSidebar(groupA) {
     return [
         {
             title: groupA,
-            collapsable: true,
+            collapsable: false,
             children: [
                 '',
-                'install',
-                'software',
+                '3.attach/1',
+                '3.attach/2',
+                '3.attach/3',
+                '3.attach/4',
             ]
         }
     ]
