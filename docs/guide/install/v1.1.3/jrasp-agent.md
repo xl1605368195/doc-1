@@ -14,11 +14,10 @@ tar -zxvf jrasp-1.1.3-linux-amd64-bin.tar.gz -C /usr/local/
 # 进入安装目录
 cd /usr/local/jrasp/bin/
 # 启动
-nohup ./service.sh >/dev/null 2>&1 &
+./jrasp-daemon
 ```
-或者 systemctl 自启动 （可选）
-```shell
-## 配置守护进程        
+> jrasp-daemon需要配置守护进程！！！
+```java
 cat << EOF > /usr/lib/systemd/system/jrasp-daemon.service
 [Unit]
 Description=jrasp-daemon service
@@ -26,10 +25,11 @@ Description=jrasp-daemon service
 [Service]
 Type=simple
 WorkingDirectory=/usr/local/jrasp/bin
-ExecStart=/usr/local/jrasp/bin/startup.sh
-ExecStop=/usr/local/jrasp/bin/shutdown.sh
+ExecStart=/usr/local/jrasp/bin/jrasp-daemon
+ExecStop=/bin/kill $MAINPID
 Restart=always
-
+StandardOutput=null
+StandardError=null
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -44,9 +44,9 @@ systemctl status jrasp-daemon.service;
 #### filebeat 安装
 ```shell
 # 下载
-wget https://www.download.jrasp.com/v1.1.2-20230709/filebeat-1.1.2-linux-x86_64.tar.gz
+wget https://www.download.jrasp.com/filebeat/filebeat-1.1.3-linux-x86_64.tar.gz
 # 解压
-tar -zxvf filebeat-1.1.2-linux-x86_64.tar.gz
+tar -zxvf filebeat-1.1.3-linux-x86_64.tar.gz
 # 进入安装目录
 cd filebeat
 # 启动

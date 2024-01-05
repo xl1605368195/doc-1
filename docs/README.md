@@ -21,6 +21,6 @@ features:
   details: 用户按照插件模板可以轻松实现安全插件的定制化需求；
 - title: 检测黑名单等实现及时更新
   details: 将热更新粒度细化到参数维度，实现各种黑、白、灰名单的及时更新；  
-footer: <a href=" https://www.beianx.cn/info/244980141219909" target="_blank">沪ICP备18021433号</a> | Copyright © 2019～2023 jrasp 安全，All rights reserved. 
+footer: <a href=" https://www.beianx.cn/info/244980141219909" target="_blank">沪ICP备18021433号</a> | Copyright © 2019～2024 jrasp 安全，All rights reserved. 
 ---
                                                                                                                                                                                                    

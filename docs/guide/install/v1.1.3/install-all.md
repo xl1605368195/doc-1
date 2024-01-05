@@ -98,18 +98,47 @@ cd ../bin
 
 ![img_15.png](./img_15.png)
 
+
+> jrasp-daemon需要配置守护进程！！！
+```java
+cat << EOF > /usr/lib/systemd/system/jrasp-daemon.service
+[Unit]
+Description=jrasp-daemon service
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/local/jrasp/bin
+ExecStart=/usr/local/jrasp/bin/jrasp-daemon
+ExecStop=/bin/kill $MAINPID
+Restart=always
+StandardOutput=null
+StandardError=null
+[Install]
+WantedBy=multi-user.target
+EOF
+
+## 设置开机启动与自动拉起
+systemctl daemon-reload;
+systemctl enable jrasp-daemon.service;
+systemctl stop jrasp-daemon.service;
+systemctl start jrasp-daemon.service;
+systemctl status jrasp-daemon.service;
+```
+
+
+
 ### 03.安装日志传输工具filebeat
 
 + 下载定制的filebeat
 ```java
-wget https://www.download.jrasp.com/v1.1.2-20230709/filebeat-1.1.2-linux-x86_64.tar.gz
+wget https://www.download.jrasp.com/filebeat/filebeat-1.1.3-linux-x86_64.tar.gz
 ```
 
 ![img_16.png](./img_16.png)
 
 + 解压到指定目录/usr/local/
 ```java
-tar -zxvf filebeat-1.1.2-linux-x86_64.tar.gz -C /usr/local/
+tar -zxvf filebeat-1.1.3-linux-x86_64.tar.gz -C /usr/local/
 ```
 ![img_17.png](./img_17.png)
 

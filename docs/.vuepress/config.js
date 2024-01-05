@@ -206,9 +206,11 @@ function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF, groupG)
             title: groupB,
             collapsable: false,
             children: [
+                'install/v1.2.0/jrasp-agent',
                 'install/v1.1.3/jrasp-agent',
                 //'install/v1.1.2/jrasp-agent',
                 'install/v1.1.3/install-all',
+                'install/v1.1.3/create_config',
                 'example/example'
             ]
         },
