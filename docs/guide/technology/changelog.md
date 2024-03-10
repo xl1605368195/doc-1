@@ -1,12 +1,28 @@
 # 版本迭代
 
-## 1.2.0  【2023-11-07】
-> 1.2.0为新版本，1.1.x 继续维护
+## 1.1.5  【2024-02-26】
+> 1.1.5 主要以修复bug为主
+### Bugfix
++ [agent] agent日志中增加ip
++ [agent] 修复jdk兼容性问题
++ [module] jndi bug 修复
++ [module] 内存马bug修复
++ [module] 默认启用反序列化
++ [module] spel开关类型不匹配bug修复
++ [daemon] 解决daemon日志写入/var/log/messages问题
 
+## 1.1.4  【2023-10-26】
 ### Enhancement
-+ [daemon] 支持宿主机上注入容器
-+ [agent] 日志传输使用socket
-+ [module] 模块配置使用注解自动提取
++ [module] 增加自定义的响应头X-Protected-By：JRASP
++ [module] 增加java.io.file#createNewFile的hook
++ [module] 增加http response的hook和检测模块
+### Bugfix
++ [module] 修复xxe模块运行类转换失败问题
++ [agent] 修复日志路径初始化为空的bug
++ [module] 修复请求中contentType判断bug
++ [module] 修复xml反序列化漏报问题
++ [daemon] 修复启动脚本service.sh进程错误识别问题
++ [daemon] 解决进程延迟上报bug
 
 ## 1.1.3  【2023-09-09】
 

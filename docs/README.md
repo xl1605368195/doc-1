@@ -6,7 +6,7 @@ actionLinks:
   text: 快速上手 →
   class: primary
 - link: /other/wechart.md
-  text: 技术交流
+  text: 商业化推广
   class: secondary
 features:
 - title: 请求低延迟

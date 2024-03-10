@@ -11,9 +11,9 @@ JRASP十分重视自身安全性的建设，采用了多种方式提高RASP自�
 
 本文介绍下JRASP如何防止关键方法被反射调用。
 
-## JDK代码中的反射加固
+## JDK代码中的反射与限制
 
-一般的我们可以通过调用class对象的`getDeclaredMethods`方法来获取该类的所有的方法（包含该类的私有方法），如：
+一般的我们可以通过调用class对象的`getDeclaredMethods`来获取该类的所有的方法（包含私有方法），如：
 ```java
 import java.lang.reflect.Method;
 
@@ -26,7 +26,7 @@ public class Main {
     }
 }
 ```
-而对于一些执行权限较高的类如`sun.misc.Unsafe`，其中的`getUnsafe`方法却无法获取。
+而对于一些执行权限较高的类如`sun.misc.Unsafe`，其中的`getUnsafe`方法却无法通过反射获取。
 原因是`sun.misc.Unsafe`的静态块中有这么一行代码:
 ```java
 static {
@@ -35,7 +35,7 @@ static {
 ```
 这个方法的作用通过方法名就可以看出来了: `注册方法到过滤器`。这个方法需要传两个参数,第一指明要过滤的Class对象,
 第二个是个String数组,里面放要过滤掉的方法名称。
-ps: 注册属性到过滤器用Reflection.registerFieldsToFilter方法
+
 Reflection在sun.reflect包下,该类维护了两个Map:
 ```java
 private static volatile Map<Class<?>, String[]> fieldFilterMap;

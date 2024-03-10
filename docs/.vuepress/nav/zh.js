@@ -16,10 +16,6 @@ module.exports = [
         link: '/algorithm/'
     },
     {
-        text: '技术博客',
-        link: '/boke/'
-    },
-    {
         text: 'github',
         link: 'https://github.com/jvm-rasp'
     },

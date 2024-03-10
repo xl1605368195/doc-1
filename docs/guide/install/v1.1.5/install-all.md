@@ -55,11 +55,11 @@ admin 123456
 
 ### 02.jrasp agent安装
 
-我这里在另外一台机器上安装，ip 地址：117.68.112.214
+我这里在另外一台机器上安装，ip 地址：117.68.117.154
 
 + 下载 agent
 ```shell
-wget https://www.download.jrasp.com/v1.1.3/jrasp-agent/jrasp-1.1.3-linux-amd64-bin.tar.gz
+wget https://www.download.jrasp.com/v1.1.5/jrasp-1.1.5-linux-amd64-bin.tar.gz
 ```
 ![img_8.png](./img_8.png)
 

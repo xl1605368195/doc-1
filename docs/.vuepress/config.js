@@ -184,8 +184,8 @@ module.exports = {
                     '/guide/': getGuideSidebar('概述', '安装', '深入', 'HOOK', '案例', 'FAQ', '故障'),
                     '/case/': getCaseSidebar('命令执行', '表达式注入', '反序列化', 'SQL注入', '文件访问', '外部实体注入'),
                     '/algorithm/': getAlgorithmSidebar('命令执行', 'SQL注入', 'XXE', '线程注入'),
-                    '/boke/': getBokeSidebar('第3章Attach技术','性能'),
-                    //'/book/': getBookSidebar('第三章attach技术')
+                    '/boke/': getBokeSidebar('性能'),
+                    '/book/': getBookSidebar('第三章Attach技术')
                 }
             }
         }
@@ -348,19 +348,8 @@ function getCaseSidebar(groupA, groupB, groupC, groupD, groupE, groupF) {
     ]
 }
 
-function getBokeSidebar(groupA, groupB) {
+function getBokeSidebar(groupB) {
     return [
-        {
-            title: groupA,
-            collapsable: false,
-            children: [
-                'attach/1',
-                'attach/2',
-                'attach/3',
-                'attach/4',
-                'attach/5',
-            ]
-        },
         {
             title: groupB,
             collapsable: false,
@@ -377,11 +366,11 @@ function getBookSidebar(groupA) {
             title: groupA,
             collapsable: false,
             children: [
-                '',
-                '3.attach/1',
-                '3.attach/2',
-                '3.attach/3',
-                '3.attach/4',
+                'attach/0',
+                'attach/1',
+                'attach/2',
+                'attach/3',
+                'attach/4',
             ]
         }
     ]
