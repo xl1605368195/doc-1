@@ -185,7 +185,7 @@ module.exports = {
                     '/case/': getCaseSidebar('命令执行', '表达式注入', '反序列化', 'SQL注入', '文件访问', '外部实体注入'),
                     '/algorithm/': getAlgorithmSidebar('命令执行', 'SQL注入', 'XXE', '线程注入'),
                     '/boke/': getBokeSidebar('性能'),
-                    '/book/': getBookSidebar('第三章Attach技术')
+                    '/book/': getBookSidebar('第一章背景介绍','第三章Attach技术','第四章类加载器')
                 }
             }
         }
@@ -360,10 +360,17 @@ function getBokeSidebar(groupB) {
     ]
 }
 
-function getBookSidebar(groupA) {
+function getBookSidebar(groupA, groupB,groupC) {
     return [
         {
             title: groupA,
+            collapsable: false,
+            children: [
+                'preface/1',
+            ]
+        },
+        {
+            title: groupB,
             collapsable: false,
             children: [
                 'attach/0',
@@ -371,6 +378,19 @@ function getBookSidebar(groupA) {
                 'attach/2',
                 'attach/3',
                 'attach/4',
+            ]
+        },
+        {
+            title: groupC,
+            collapsable: false,
+            children: [
+                'classloader/0',
+                'classloader/1',
+                'classloader/2',
+                'classloader/3',
+                'classloader/4',
+                'classloader/5',
+                'classloader/6',
             ]
         }
     ]
