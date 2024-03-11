@@ -181,10 +181,9 @@ module.exports = {
                 lastUpdated: "上次更新",
                 nav: require('./nav/zh'),
                 sidebar: {
-                    '/guide/': getGuideSidebar('概述', '安装', '深入', 'HOOK', '案例', 'FAQ', '故障'),
+                    '/guide/': getGuideSidebar('概述', '安装', '深入', '案例', 'FAQ', '故障'),
                     '/case/': getCaseSidebar('命令执行', '表达式注入', '反序列化', 'SQL注入', '文件访问', '外部实体注入'),
                     '/algorithm/': getAlgorithmSidebar('命令执行', 'SQL注入', 'XXE', '线程注入'),
-                    '/boke/': getBokeSidebar('性能'),
                     '/book/': getBookSidebar('第一章背景介绍','第三章Attach技术','第四章类加载器')
                 }
             }
@@ -192,7 +191,7 @@ module.exports = {
     }
 };
 
-function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF, groupG) {
+function getGuideSidebar(groupA, groupB, groupC, groupE, groupF, groupG) {
     return [
         {
             title: groupA,
@@ -223,17 +222,6 @@ function getGuideSidebar(groupA, groupB, groupC, groupD, groupE, groupF, groupG)
                 'technology/runtime-mode',
                 'technology/hotupdate',
                 'technology/native_method'
-            ]
-        },
-        {
-            title: groupD,
-            collapsable: false,
-            children: [
-                'hook/introduction',
-                'hook/rce',
-                'hook/attach',
-                'hook/jni',
-                'hook/deserialization'
             ]
         },
         {
@@ -347,19 +335,6 @@ function getCaseSidebar(groupA, groupB, groupC, groupD, groupE, groupF) {
         }
     ]
 }
-
-function getBokeSidebar(groupB) {
-    return [
-        {
-            title: groupB,
-            collapsable: false,
-            children: [
-                'performance/asm'
-            ]
-        }
-    ]
-}
-
 function getBookSidebar(groupA, groupB,groupC) {
     return [
         {
