@@ -222,7 +222,8 @@ function getGuideSidebar(groupA, groupB, groupC, groupE, groupF, groupG) {
                 'technology/runtime-mode',
                 'technology/hotupdate',
                 'technology/native_method',
-                'technology/memory_leak'
+                'technology/memory_leak',
+                'technology/reflect'
             ]
         },
         {
