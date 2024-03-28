@@ -1,5 +1,18 @@
 # 版本迭代
 
+> 1.2.x为商业版本，1.1.x为开源版本
+
+## 1.2.1  【2024-03-21】 进行中
+
+### Enhancement
++ [agent] 增加告警压制、限流功能
++ [daemon] 解析Java进程的pid文件
++ [daemon] 增加临时授权15天功能
++ [module] 增加内存马检测hook类
+
+### Bugfix
++ [agent] 修复rasp线程池finalize内存泄漏bug
+
 ## 1.1.5  【2024-02-26】
 > 1.1.5 主要以修复bug为主
 ### Bugfix
@@ -10,6 +23,23 @@
 + [module] 默认启用反序列化
 + [module] spel开关类型不匹配bug修复
 + [daemon] 解决daemon日志写入/var/log/messages问题
+
+## 1.2.0  【2023-11-07】
+
+### Enhancement
++ [daemon] 支持宿主机上注入容器
++ [daemon] 增加环境指纹识别
++ [agent] 日志传输使用socket
++ [agent] 字节码框架简化
++ [agent] 增加限流功能
++ [agent] 日志对象异步序列化与传输
++ [agent] 卸载接口增加安全检查
++ [module] 新增agent-load-hook
++ [module] 模块重构，降低模块研发门槛
++ [工程] 增加跨平台交叉编译功能
++ [agent] jrasp-core运行时加密
+### Bugfix
++ [module] 本机IP不使用request中ip
 
 ## 1.1.4  【2023-10-26】
 ### Enhancement
