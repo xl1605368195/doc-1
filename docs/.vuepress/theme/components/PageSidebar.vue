@@ -75,12 +75,12 @@
 
       <div class="option-box" v-on:mouseover="showToc($event)" v-on:mouseout="hideToc($event)">
         <img class="nozoom" src="/images/system/wexin4.png" width="25px" />
-        <span class="show-txt">技术群</span>
+        <span class="show-txt">商业合作</span>
         <div class="toc-container">
             <div class="pos-box">
               <div class="icon-arrow"></div>
               <div class="scroll-box" style="text-align:center" >
-                <span style="font-size:0.8rem;font-weight:bold;">添加作者微信<span style="color:red;">(patton)</span>进入jrasp技术交流群「无任何套路」</span>
+                <span style="font-size:0.8rem;font-weight:bold;">商业化合作请添加作者微信<span style="color:red;">XL1870011370</span>(乙方勿扰！！)</span>
                 <img src="/images/personal/patton.png" height="180px" style="margin:10px;"/>
                 PS：添加时请备注<b>jrasp</b>，谢谢！
               </div>
