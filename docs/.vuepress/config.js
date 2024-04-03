@@ -184,7 +184,7 @@ module.exports = {
                     '/guide/': getGuideSidebar('概述', '安装', '深入', '案例', 'FAQ', '故障'),
                     '/case/': getCaseSidebar('命令执行', '表达式注入', '反序列化', 'SQL注入', '文件访问', '外部实体注入'),
                     '/algorithm/': getAlgorithmSidebar('命令执行', 'SQL注入', 'XXE', '线程注入'),
-                    '/book/': getBookSidebar('第一章背景介绍','第三章Attach技术', '第四章类加载器',
+                    '/book/': getBookSidebar('本书序言与推荐','第一章背景介绍','第二章字节码指令简介','第三章Attach技术', '第四章类加载器',
                         '第五章线程变量','第六章Java Agent','第七章性能诊断工具',
                         '第八章RASP实现原理','第九章命令执行'
                     )
@@ -340,13 +340,27 @@ function getCaseSidebar(groupA, groupB, groupC, groupD, groupE, groupF) {
         }
     ]
 }
-function getBookSidebar(groupA, groupB, groupC, groupD, groupE,groupF,groupG,groupH) {
+function getBookSidebar(group0, groupA,groupA1, groupB, groupC, groupD, groupE,groupF,groupG,groupH) {
     return [
+        {
+            title: group0,
+            collapsable: false,
+            children: [
+                'recommendation/0',
+            ]
+        },
         {
             title: groupA,
             collapsable: false,
             children: [
                 'preface/1',
+            ]
+        },
+        {
+            title: groupA1,
+            collapsable: false,
+            children: [
+
             ]
         },
         {
@@ -396,16 +410,12 @@ function getBookSidebar(groupA, groupB, groupC, groupD, groupE,groupF,groupG,gro
                 'tools/0',
                 'tools/1',
                 'tools/2',
-            ]
-        }
-        ,
-        {
-            title: groupF,
-            collapsable: false,
-            children: [
-                'tools/0',
-                'tools/1',
-                'tools/2',
+                'tools/3',
+                'tools/4',
+                'tools/5',
+                'tools/6',
+                'tools/7',
+                'tools/8',
             ]
         },
         {
