@@ -184,9 +184,9 @@ module.exports = {
                     '/guide/': getGuideSidebar('概述', '安装', '深入', '案例', 'FAQ', '故障'),
                     '/case/': getCaseSidebar('命令执行', '表达式注入', '反序列化', 'SQL注入', '文件访问', '外部实体注入'),
                     '/algorithm/': getAlgorithmSidebar('命令执行', 'SQL注入', 'XXE', '线程注入'),
-                    '/book/': getBookSidebar('本书序言与推荐','第一章背景介绍','第二章字节码指令简介','第三章Attach技术', '第四章类加载器',
-                        '第五章线程变量','第六章Java Agent','第七章性能诊断工具',
-                        '第八章RASP实现原理','第九章命令执行'
+                    '/book/': getBookSidebar('本书序言与推荐', '第一章背景介绍', '第二章字节码指令简介', '第三章Attach技术', '第四章类加载器',
+                        '第五章线程变量', '第六章Java Agent', '第七章性能诊断工具',
+                        '第八章RASP实现原理', '第九章命令执行', '第十章表达式执行'
                     )
                 }
             }
@@ -340,7 +340,8 @@ function getCaseSidebar(groupA, groupB, groupC, groupD, groupE, groupF) {
         }
     ]
 }
-function getBookSidebar(group0, groupA,groupA1, groupB, groupC, groupD, groupE,groupF,groupG,groupH) {
+
+function getBookSidebar(group0, groupA, groupA1, groupB, groupC, groupD, groupE, groupF, groupG, groupH, groupH2) {
     return [
         {
             title: group0,
@@ -359,9 +360,7 @@ function getBookSidebar(group0, groupA,groupA1, groupB, groupC, groupD, groupE,g
         {
             title: groupA1,
             collapsable: false,
-            children: [
-
-            ]
+            children: []
         },
         {
             title: groupB,
@@ -391,7 +390,11 @@ function getBookSidebar(group0, groupA,groupA1, groupB, groupC, groupD, groupE,g
             title: groupD,
             collapsable: false,
             children: [
-                'threadlocal/0'
+                'threadlocal/0',
+                'threadlocal/1',
+                'threadlocal/2',
+                'threadlocal/3',
+                'threadlocal/4',
             ]
         },
         {
@@ -421,9 +424,7 @@ function getBookSidebar(group0, groupA,groupA1, groupB, groupC, groupD, groupE,g
         {
             title: groupG,
             collapsable: false,
-            children: [
-
-            ]
+            children: []
         },
         {
             title: groupH,
@@ -434,7 +435,17 @@ function getBookSidebar(group0, groupA,groupA1, groupB, groupC, groupD, groupE,g
                 'rce/2',
                 'rce/3',
             ]
-        }
+        },
+        {
+            title: groupH2,
+            collapsable: false,
+            children: [
+                'expression/0',
+                'expression/1',
+                'expression/2',
+                'expression/3',
+            ]
+        },
     ]
 }
 
