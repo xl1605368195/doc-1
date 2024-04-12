@@ -444,6 +444,7 @@ function getBookSidebar(group0, groupA, groupA1, groupB, groupC, groupD, groupE,
                 'expression/1',
                 'expression/2',
                 'expression/3',
+                'expression/4',
             ]
         },
     ]
