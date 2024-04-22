@@ -447,6 +447,17 @@ function getBookSidebar(group0, groupA, groupA1, groupB, groupC, groupD, groupE,
                 'expression/4',
             ]
         },
+        {
+            title: '第十一章内存马',
+            collapsable: false,
+            children: [
+                'shell/0',
+                'shell/1',
+                'shell/2',
+                'shell/3',
+                'shell/4',
+            ]
+        }
     ]
 }
 
