@@ -457,6 +457,16 @@ function getBookSidebar(group0, groupA, groupA1, groupB, groupC, groupD, groupE,
                 'shell/3',
                 'shell/4',
             ]
+        },
+        {
+            title: '第十四章外部实体注入XXE',
+            collapsable: false,
+            children: [
+                'xxe/0',
+                'xxe/1',
+                'xxe/2',
+                'xxe/3',
+            ]
         }
     ]
 }
