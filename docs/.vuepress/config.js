@@ -434,6 +434,7 @@ function getBookSidebar(group0, groupA, groupA1, groupB, groupC, groupD, groupE,
                 'rce/1',
                 'rce/2',
                 'rce/3',
+                'rce/4',
             ]
         },
         {
